@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+{% block title %}Métriques ML — Orchiimmo{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Accueil</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'predictions:form' %}">Estimation</a></li>
+    <li class="breadcrumb-item active">Métriques ML</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0">
+    <i class="bi bi-bar-chart-fill text-primary me-2"></i>
+    <span data-lang-fr>Métriques du Modèle ML</span>
+    <span data-lang-ar>مقاييس نموذج ML</span>
+  </h2>
+  <span class="badge bg-success fs-6">
+    <i class="bi bi-trophy me-1"></i>
+    Meilleur : {{ best_model }}
+  </span>
+</div>
+
+{% if meta %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center border-primary">
+      <div class="card-body py-3">
+        <div class="fs-3 fw-bold text-primary">{{ meta.R2|floatformat:3 }}</div>
+        <small class="text-muted">R² (Coefficient)</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="fs-3 fw-bold text-warning">{{ meta.MAPE|floatformat:1 }}%</div>
+        <small class="text-muted">MAPE (Erreur %)</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="fs-3 fw-bold text-info">{{ meta.n_train }}</div>
+        <small class="text-muted">Exemples entraînement</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="fs-3 fw-bold text-success">{{ meta.version }}</div>
+        <small class="text-muted">Version modèle</small>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Tableau comparaison des modèles -->
+{% if metrics %}
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">
+      <i class="bi bi-table me-2"></i>
+      <span data-lang-fr>Comparaison des Modèles</span>
+      <span data-lang-ar>مقارنة النماذج</span>
+    </h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Modèle</th>
+            <th class="text-center">R² ↑</th>
+            <th class="text-center">MAE (DH) ↓</th>
+            <th class="text-center">RMSE (DH) ↓</th>
+            <th class="text-center">MAPE % ↓</th>
+            <th class="text-center">Statut</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for model_name, m in metrics.items %}
+          <tr {% if model_name == best_model %}class="table-success"{% endif %}>
+            <td class="fw-bold">
+              <i class="bi bi-cpu me-2"></i>{{ model_name }}
+            </td>
+            <td class="text-center">
+              <span class="{% if m.R2 >= 0.75 %}text-success fw-bold{% elif m.R2 >= 0.5 %}text-warning{% else %}text-danger{% endif %}">
+                {{ m.R2|floatformat:4 }}
+              </span>
+            </td>
+            <td class="text-center">{{ m.MAE|floatformat:0 }}</td>
+            <td class="text-center">{{ m.RMSE|floatformat:0 }}</td>
+            <td class="text-center">{{ m.MAPE|floatformat:1 }}%</td>
+            <td class="text-center">
+              {% if model_name == best_model %}
+                <span class="badge bg-success"><i class="bi bi-trophy me-1"></i>Meilleur</span>
+              {% else %}
+                <span class="badge bg-secondary">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Graphique Chart.js -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>R² par modèle</h5>
+  </div>
+  <div class="card-body">
+    <canvas id="metricsChart" height="120"></canvas>
+  </div>
+</div>
+{% endif %}
+
+<!-- Feature Importance -->
+{% if fi_data %}
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">
+      <i class="bi bi-list-ol me-2"></i>
+      <span data-lang-fr>Top 10 — Importance des Variables</span>
+      <span data-lang-ar>أهم 10 متغيرات</span>
+    </h5>
+  </div>
+  <div class="card-body">
+    {% for fi in fi_data %}
+    <div class="mb-2">
+      <div class="d-flex justify-content-between mb-1">
+        <small class="fw-semibold">{{ fi.feature }}</small>
+        <small class="text-muted">{{ fi.importance|floatformat:4 }}</small>
+      </div>
+      {% widthratio fi.importance|floatformat:4 fi_data.0.importance|floatformat:4 100 as pct %}
+      <div class="progress" style="height:8px;">
+        <div class="progress-bar bg-primary" style="width:{{ pct }}%"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="alert alert-info">
+  <i class="bi bi-info-circle me-2"></i>
+  <strong>Scope :</strong> Appartements en vente au Maroc uniquement.
+  Données issues de Mubawab, Avito, Sarouty.
+  Entraîné en log-espace pour réduire l'asymétrie des prix.
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{% if metrics %}
+<script>
+const labels = [{% for m in metrics %}'{{ m }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+const r2vals = [{% for m, v in metrics.items %}{{ v.R2|floatformat:4 }}{% if not forloop.last %},{% endif %}{% endfor %}];
+
+const ctx = document.getElementById('metricsChart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'R² Score',
+      data: r2vals,
+      backgroundColor: r2vals.map(v => v >= 0.75 ? '#06D6A0' : v >= 0.5 ? '#F4A261' : '#EF4444'),
+      borderRadius: 8,
+    }]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: {
+        beginAtZero: true, max: 1,
+        grid: { color: '#334155' },
+        ticks: { color: '#94a3b8' }
+      },
+      x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => `R² = ${ctx.raw.toFixed(4)} ${ctx.raw >= 0.75 ? '✅' : ctx.raw >= 0.5 ? '⚠️' : '❌'}`
+        }
+      }
+    }
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

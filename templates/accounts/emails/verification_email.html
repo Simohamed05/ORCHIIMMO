@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #0f1117; color: #e2e8f0; margin: 0; padding: 20px; }
+  .container { max-width: 560px; margin: 0 auto; background: #1a1d27; border-radius: 12px; padding: 40px; border: 1px solid #334155; }
+  .logo { text-align: center; margin-bottom: 30px; }
+  .logo h1 { color: #4895EF; font-size: 28px; margin: 0; }
+  h2 { color: #e2e8f0; margin-top: 0; }
+  p { color: #94a3b8; line-height: 1.6; }
+  .btn { display: inline-block; background: linear-gradient(135deg, #4895EF, #7C3AED); color: white !important; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; margin: 20px 0; }
+  .footer { margin-top: 30px; text-align: center; color: #475569; font-size: 12px; }
+  .url-fallback { word-break: break-all; color: #4895EF; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">
+    <h1>🏠 ORCHIIMMO</h1>
+    <p style="margin:4px 0;color:#64748b;font-size:13px;">Plateforme Immobilière Maroc</p>
+  </div>
+
+  <h2>Bonjour {{ user.first_name|default:user.username }} !</h2>
+  <p>Merci de vous être inscrit sur <strong>Orchiimmo</strong>. Pour activer votre compte et accéder à toutes les fonctionnalités, veuillez vérifier votre adresse email.</p>
+
+  <div style="text-align:center;">
+    <a href="{{ verify_url }}" class="btn">✅ Vérifier mon compte</a>
+  </div>
+
+  <p>Ce lien expire dans <strong>24 heures</strong>. Si vous n'avez pas créé de compte, ignorez cet email.</p>
+
+  <p style="font-size:13px;color:#475569;">Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :</p>
+  <p class="url-fallback">{{ verify_url }}</p>
+
+  <div class="footer">
+    <p>© 2026 Orchiimmo — PFE Immobilier Maroc &amp; Espagne</p>
+    <p>Cet email a été envoyé automatiquement, ne pas répondre.</p>
+  </div>
+</div>
+</body>
+</html>

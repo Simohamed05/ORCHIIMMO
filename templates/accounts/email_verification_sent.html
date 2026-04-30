@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Email de vérification envoyé — Orchiimmo{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 text-center py-5">
+    <i class="bi bi-envelope-check-fill text-primary" style="font-size:5rem;"></i>
+    <h2 class="fw-bold mt-3">
+      <span data-lang-fr>Vérifiez votre email</span>
+      <span data-lang-ar>تحقق من بريدك الإلكتروني</span>
+    </h2>
+    <p class="text-muted mt-3 fs-5">
+      <span data-lang-fr>
+        Un email de vérification vous a été envoyé.<br>
+        Cliquez sur le lien dans l'email pour activer votre compte.
+      </span>
+      <span data-lang-ar>
+        تم إرسال بريد إلكتروني للتحقق.<br>
+        انقر على الرابط في البريد لتفعيل حسابك.
+      </span>
+    </p>
+    <div class="alert alert-info mt-4 text-start">
+      <i class="bi bi-info-circle me-2"></i>
+      <span data-lang-fr>
+        <strong>Le lien expire dans 24 heures.</strong><br>
+        Vérifiez aussi votre dossier <strong>Spam / Indésirables</strong> si vous ne trouvez pas l'email.
+      </span>
+      <span data-lang-ar>
+        <strong>الرابط صالح لمدة 24 ساعة.</strong><br>
+        تحقق أيضاً من مجلد <strong>الرسائل غير المرغوب فيها (Spam)</strong>.
+      </span>
+    </div>
+    <hr class="my-4">
+    <p class="text-muted">
+      <span data-lang-fr>Vous n'avez pas reçu l'email ?</span>
+      <span data-lang-ar>لم تستلم البريد؟</span>
+    </p>
+    <form method="post" action="{% url 'accounts:resend_verification' %}" class="d-inline">
+      {% csrf_token %}
+      <div class="input-group mb-3 mx-auto" style="max-width:300px;">
+        <input type="text" name="username" class="form-control"
+               placeholder="Votre nom d'utilisateur" required>
+        <button type="submit" class="btn btn-outline-primary">
+          <i class="bi bi-arrow-clockwise me-1"></i>
+          <span data-lang-fr>Renvoyer</span>
+          <span data-lang-ar>إعادة إرسال</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

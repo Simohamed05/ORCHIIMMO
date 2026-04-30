@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}{% if error %}Lien invalide{% else %}Email vérifié{% endif %} — Orchiimmo{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 text-center py-5">
+    {% if error %}
+      <i class="bi bi-x-circle-fill text-danger" style="font-size:5rem;"></i>
+      <h2 class="fw-bold mt-3 text-danger">
+        <span data-lang-fr>Lien invalide ou expiré</span>
+        <span data-lang-ar>الرابط غير صالح أو منتهي الصلاحية</span>
+      </h2>
+      <p class="text-muted mt-3">
+        <span data-lang-fr>Le lien de vérification a expiré (24h) ou est incorrect.<br>Veuillez demander un nouveau lien.</span>
+        <span data-lang-ar>انتهت صلاحية رابط التحقق أو أنه غير صحيح. اطلب رابطاً جديداً.</span>
+      </p>
+      <a href="{% url 'accounts:verification_sent' %}" class="btn btn-primary mt-3">
+        <i class="bi bi-arrow-clockwise me-2"></i>
+        <span data-lang-fr>Demander un nouveau lien</span>
+        <span data-lang-ar>طلب رابط جديد</span>
+      </a>
+    {% else %}
+      <i class="bi bi-check-circle-fill text-success" style="font-size:5rem;"></i>
+      <h2 class="fw-bold mt-3 text-success">
+        <span data-lang-fr>Email vérifié !</span>
+        <span data-lang-ar>تم التحقق من البريد!</span>
+      </h2>
+      <p class="text-muted mt-3 fs-5">
+        <span data-lang-fr>Votre compte est maintenant actif. Bienvenue sur Orchiimmo !</span>
+        <span data-lang-ar>حسابك نشط الآن. مرحباً بك في Orchiimmo!</span>
+      </p>
+      <a href="{% url 'predictions:form' %}" class="btn btn-primary btn-lg mt-3">
+        <i class="bi bi-calculator me-2"></i>
+        <span data-lang-fr>Commencer l'estimation</span>
+        <span data-lang-ar>ابدأ التقدير</span>
+      </a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

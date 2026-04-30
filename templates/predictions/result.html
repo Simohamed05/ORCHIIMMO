@@ -1,8 +1,16 @@
 {% extends 'base.html' %}
-{% block title %}Estimation — {{ pred.city }} {{ pred.area_m2|floatformat:0 }}m²{% endblock %}
+{% block title %}Estimation — {{ pred.city|capfirst }} {{ pred.area_m2|floatformat:0 }}m²{% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+@media print {
+  .navbar, .breadcrumb, .btn, footer, #map { display: none !important; }
+  .card { border: 1px solid #ccc !important; }
+  body { background: white !important; color: black !important; }
+  .prix-principal { color: #1a1d27 !important; }
+}
+</style>
 {% endblock %}
 
 {% block content %}
@@ -10,22 +18,9 @@
 <!-- Breadcrumb -->
 <nav aria-label="breadcrumb" class="mb-4">
   <ol class="breadcrumb">
-    <li class="breadcrumb-item">
-      <a href="{% url 'home' %}">
-        <span data-lang-fr>Accueil</span>
-        <span data-lang-ar>الرئيسية</span>
-      </a>
-    </li>
-    <li class="breadcrumb-item">
-      <a href="{% url 'predictions:form' %}">
-        <span data-lang-fr>Estimation</span>
-        <span data-lang-ar>التقدير</span>
-      </a>
-    </li>
-    <li class="breadcrumb-item active">
-      <span data-lang-fr>Résultat</span>
-      <span data-lang-ar>النتيجة</span>
-    </li>
+    <li class="breadcrumb-item"><a href="{% url 'home' %}"><span data-lang-fr>Accueil</span><span data-lang-ar>الرئيسية</span></a></li>
+    <li class="breadcrumb-item"><a href="{% url 'predictions:form' %}"><span data-lang-fr>Estimation</span><span data-lang-ar>التقدير</span></a></li>
+    <li class="breadcrumb-item active"><span data-lang-fr>Résultat</span><span data-lang-ar>النتيجة</span></li>
   </ol>
 </nav>
 
@@ -34,12 +29,16 @@
   <!-- Résultat principal -->
   <div class="col-lg-6">
     <div class="card border-primary shadow">
-      <div class="card-header bg-primary text-white">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0">
           <i class="bi bi-house-check me-2"></i>
-          {{ pred.city }}{% if pred.district %} — {{ pred.district }}{% endif %}
+          {{ pred.city|capfirst }}{% if pred.district %} — {{ pred.district }}{% endif %}
           &nbsp;|&nbsp; {{ pred.area_m2|floatformat:0 }} m²
         </h5>
+        <button onclick="window.print()" class="btn btn-sm btn-light" title="Télécharger PDF">
+          <i class="bi bi-file-earmark-pdf-fill text-danger"></i>
+          <span class="d-none d-md-inline ms-1" data-lang-fr>PDF</span>
+        </button>
       </div>
       <div class="card-body text-center py-4">
 
@@ -78,43 +77,31 @@
           <div class="col-6">
             <div class="kpi-box">
               <div class="fw-bold text-primary">{{ pred.price_per_m2_mad|floatformat:0 }} DH/m²</div>
-              <small class="text-muted">
-                <span data-lang-fr>Prix au m²</span>
-                <span data-lang-ar>السعر/م²</span>
-              </small>
+              <small class="text-muted"><span data-lang-fr>Prix au m²</span><span data-lang-ar>السعر/م²</span></small>
             </div>
           </div>
           <div class="col-6">
             <div class="kpi-box">
               <div class="fw-bold">{{ pred.bedrooms }} ch. / {{ pred.bathrooms }} sdb</div>
-              <small class="text-muted">
-                <span data-lang-fr>Caractéristiques</span>
-                <span data-lang-ar>المميزات</span>
-              </small>
+              <small class="text-muted"><span data-lang-fr>Caractéristiques</span><span data-lang-ar>المميزات</span></small>
             </div>
           </div>
           <div class="col-6">
             <div class="kpi-box">
-              <div class="fw-bold text-warning">{{ pred.property_type }}</div>
-              <small class="text-muted">
-                <span data-lang-fr>Type</span>
-                <span data-lang-ar>النوع</span>
-              </small>
+              <div class="fw-bold text-warning">{{ pred.get_property_type_display }}</div>
+              <small class="text-muted"><span data-lang-fr>Type</span><span data-lang-ar>النوع</span></small>
             </div>
           </div>
           <div class="col-6">
             <div class="kpi-box">
               <div class="fw-bold text-success">{{ pred.model_version }}</div>
-              <small class="text-muted">
-                <span data-lang-fr>Version modèle</span>
-                <span data-lang-ar>إصدار النموذج</span>
-              </small>
+              <small class="text-muted"><span data-lang-fr>Version modèle</span><span data-lang-ar>إصدار النموذج</span></small>
             </div>
           </div>
         </div>
 
         <!-- Actions -->
-        <div class="d-flex gap-2 justify-content-center mt-3">
+        <div class="d-flex gap-2 justify-content-center flex-wrap mt-3">
           <a href="{% url 'predictions:form' %}" class="btn btn-primary">
             <i class="bi bi-plus-circle me-1"></i>
             <span data-lang-fr>Nouvelle estimation</span>
@@ -124,6 +111,11 @@
             <i class="bi bi-clock-history me-1"></i>
             <span data-lang-fr>Historique</span>
             <span data-lang-ar>السجل</span>
+          </a>
+          <a href="{% url 'predictions:metrics' %}" class="btn btn-outline-info">
+            <i class="bi bi-bar-chart me-1"></i>
+            <span data-lang-fr>Métriques ML</span>
+            <span data-lang-ar>مقاييس</span>
           </a>
         </div>
       </div>
@@ -147,22 +139,10 @@
           <table class="table table-sm table-hover mb-0">
             <thead>
               <tr>
-                <th>
-                  <span data-lang-fr>Quartier</span>
-                  <span data-lang-ar>الحي</span>
-                </th>
-                <th>
-                  <span data-lang-fr>Surface</span>
-                  <span data-lang-ar>المساحة</span>
-                </th>
-                <th>
-                  <span data-lang-fr>Prix (DH)</span>
-                  <span data-lang-ar>السعر (DH)</span>
-                </th>
-                <th>
-                  <span data-lang-fr>Lien</span>
-                  <span data-lang-ar>رابط</span>
-                </th>
+                <th><span data-lang-fr>Quartier</span><span data-lang-ar>الحي</span></th>
+                <th><span data-lang-fr>Surface</span><span data-lang-ar>المساحة</span></th>
+                <th><span data-lang-fr>Prix (DH)</span><span data-lang-ar>السعر (DH)</span></th>
+                <th><span data-lang-fr>Lien</span><span data-lang-ar>رابط</span></th>
               </tr>
             </thead>
             <tbody>
@@ -187,8 +167,8 @@
       {% else %}
         <div class="card-body text-center text-muted py-3">
           <i class="bi bi-search me-1"></i>
-          <span data-lang-fr>Pas de comparables trouvés dans la base pour {{ pred.city }}.</span>
-          <span data-lang-ar>لا توجد عقارات مماثلة لـ {{ pred.city }} في قاعدة البيانات.</span>
+          <span data-lang-fr>Pas de comparables trouvés pour {{ pred.city|capfirst }}. Lancez un scraping pour enrichir la base.</span>
+          <span data-lang-ar>لا توجد عقارات مماثلة لـ {{ pred.city }}. قم بالاستخراج لإثراء قاعدة البيانات.</span>
         </div>
       {% endif %}
     </div>
@@ -198,8 +178,8 @@
       <div class="card-header">
         <h6 class="mb-0">
           <i class="bi bi-map me-2"></i>
-          <span data-lang-fr>Localisation</span>
-          <span data-lang-ar>الموقع</span>
+          <span data-lang-fr>Localisation — {{ pred.city|capfirst }}</span>
+          <span data-lang-ar>الموقع — {{ pred.city|capfirst }}</span>
         </h6>
       </div>
       <div class="card-body p-0">
@@ -215,33 +195,69 @@
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// Données comparables avec géoloc
+// Coordonnées des principales villes marocaines
+const CITY_COORDS = {
+  'casablanca': [33.5731, -7.5898], 'marrakech': [31.6295, -7.9811],
+  'rabat': [34.0209, -6.8416],      'fes': [34.0181, -5.0078],
+  'fès': [34.0181, -5.0078],        'tanger': [35.7595, -5.8340],
+  'agadir': [30.4278, -9.5981],     'meknes': [33.8935, -5.5547],
+  'meknès': [33.8935, -5.5547],     'oujda': [34.6800, -1.9000],
+  'kenitra': [34.2541, -6.5893],    'kénitra': [34.2541, -6.5893],
+  'tetouan': [35.5785, -5.3684],    'tétouan': [35.5785, -5.3684],
+  'sale': [34.0531, -6.7985],       'salé': [34.0531, -6.7985],
+  'mohammedia': [33.6861, -7.3830], 'temara': [33.9288, -6.9117],
+  'el jadida': [33.2549, -8.5076],  'safi': [32.2994, -9.2372],
+  'beni mellal': [32.3372, -6.3498],'nador': [35.1681, -2.9279],
+  'essaouira': [31.5117, -9.7706],  'dakhla': [23.7130, -15.9358],
+  'laayoune': [27.1536, -13.2033],  'laâyoune': [27.1536, -13.2033],
+  'settat': [33.0010, -7.6165],     'berrechid': [33.2658, -7.5886],
+  'khouribga': [32.8817, -6.9063],  'bouskoura': [33.4501, -7.6489],
+  'dar bouazza': [33.4800, -7.7500],'errachidia': [31.9298, -4.4249],
+  'ouarzazate': [30.9185, -6.8934], 'tiznit': [29.6974, -9.7316],
+};
+
+const cityKey = '{{ pred.city|lower }}'.trim();
 const comparables = {{ comparables_json|safe }};
 
-// Centrer sur le Maroc par défaut
-let center = [31.5, -7.0];
-let zoom   = 6;
+// Centre : coordonnées connues de la ville ou Maroc entier
+let center = CITY_COORDS[cityKey] || [31.5, -7.0];
+let zoom   = CITY_COORDS[cityKey] ? 12 : 6;
 
-// Si un comparable a des coords, centrer dessus
-const withGeo = comparables.filter(c => c.latitude && c.longitude);
+// Si des comparables ont des coords, utiliser le premier
+const withGeo = comparables.filter(c => c.lat && c.lng);
 if (withGeo.length > 0) {
-  center = [withGeo[0].latitude, withGeo[0].longitude];
-  zoom   = 11;
+  center = [withGeo[0].lat, withGeo[0].lng];
+  zoom   = 12;
 }
 
 const map = L.map('map').setView(center, zoom);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap',
-  maxZoom: 18
+  attribution: '© OpenStreetMap', maxZoom: 18
 }).addTo(map);
 
+// Marqueur de la ville prédite (même sans coords exactes)
+if (CITY_COORDS[cityKey]) {
+  L.marker(CITY_COORDS[cityKey], {
+    icon: L.divIcon({
+      className: '',
+      html: '<div style="background:#4895EF;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+    })
+  }).addTo(map)
+   .bindPopup(`<strong>{{ pred.city|capfirst }}</strong><br>{{ pred.predicted_price_mad|floatformat:0 }} DH estimé`)
+   .openPopup();
+}
+
+// Marqueurs comparables
 withGeo.forEach(c => {
-  L.marker([c.latitude, c.longitude])
-   .addTo(map)
+  L.circleMarker([c.lat, c.lng], {
+    radius: 8, color: '#F4A261', fillColor: '#F4A261', fillOpacity: 0.7
+  }).addTo(map)
    .bindPopup(
      `<strong>${c.city}</strong><br>`+
-     `${c.area_m2 ? c.area_m2.toFixed(0)+' m² &mdash; ' : ''}`+
-     `<span class="text-primary">${Number(c.price_mad||0).toLocaleString('fr-MA')} DH</span>`
+     `${c.area ? c.area.toFixed(0)+' m² — ' : ''}`+
+     `${Number(c.price_mad||c.prix||0).toLocaleString('fr-MA')} DH`
    );
 });
 </script>

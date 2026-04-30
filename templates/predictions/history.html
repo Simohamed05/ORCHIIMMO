@@ -9,11 +9,18 @@
     <span data-lang-fr>Mes Estimations</span>
     <span data-lang-ar>تقديراتي</span>
   </h2>
-  <a href="{% url 'predictions:form' %}" class="btn btn-primary">
-    <i class="bi bi-plus-circle me-1"></i>
-    <span data-lang-fr>Nouvelle estimation</span>
-    <span data-lang-ar>تقدير جديد</span>
-  </a>
+  <div class="d-flex gap-2">
+    <a href="{% url 'predictions:metrics' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-bar-chart me-1"></i>
+      <span data-lang-fr>Métriques ML</span>
+      <span data-lang-ar>مقاييس النموذج</span>
+    </a>
+    <a href="{% url 'predictions:form' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>
+      <span data-lang-fr>Nouvelle estimation</span>
+      <span data-lang-ar>تقدير جديد</span>
+    </a>
+  </div>
 </div>
 
 {% if predictions %}
@@ -53,34 +60,13 @@
         <table class="table table-hover mb-0">
           <thead>
             <tr>
-              <th>
-                <span data-lang-fr>Date</span>
-                <span data-lang-ar>التاريخ</span>
-              </th>
-              <th>
-                <span data-lang-fr>Ville</span>
-                <span data-lang-ar>المدينة</span>
-              </th>
-              <th>
-                <span data-lang-fr>Type</span>
-                <span data-lang-ar>النوع</span>
-              </th>
-              <th class="text-end">
-                <span data-lang-fr>Surface</span>
-                <span data-lang-ar>المساحة</span>
-              </th>
-              <th class="text-end">
-                <span data-lang-fr>Prix estimé (DH)</span>
-                <span data-lang-ar>السعر المقدر (DH)</span>
-              </th>
-              <th class="text-end">
-                <span data-lang-fr>Prix/m² (DH)</span>
-                <span data-lang-ar>السعر/م² (DH)</span>
-              </th>
-              <th class="text-center">
-                <span data-lang-fr>Action</span>
-                <span data-lang-ar>إجراء</span>
-              </th>
+              <th><span data-lang-fr>Date</span><span data-lang-ar>التاريخ</span></th>
+              <th><span data-lang-fr>Ville</span><span data-lang-ar>المدينة</span></th>
+              <th><span data-lang-fr>Type</span><span data-lang-ar>النوع</span></th>
+              <th class="text-end"><span data-lang-fr>Surface</span><span data-lang-ar>المساحة</span></th>
+              <th class="text-end"><span data-lang-fr>Prix estimé (DH)</span><span data-lang-ar>السعر المقدر (DH)</span></th>
+              <th class="text-end"><span data-lang-fr>Prix/m² (DH)</span><span data-lang-ar>السعر/م² (DH)</span></th>
+              <th class="text-center"><span data-lang-fr>Action</span><span data-lang-ar>إجراء</span></th>
             </tr>
           </thead>
           <tbody>
@@ -88,16 +74,14 @@
             <tr>
               <td class="text-muted small">{{ pred.created_at|date:"d/m/Y H:i" }}</td>
               <td>
-                <strong>{{ pred.city }}</strong>
+                <strong>{{ pred.city|capfirst }}</strong>
                 {% if pred.district %}
                   <br><small class="text-muted">{{ pred.district }}</small>
                 {% endif %}
               </td>
-              <td><span class="badge bg-secondary">{{ pred.property_type }}</span></td>
+              <td><span class="badge bg-secondary">{{ pred.get_property_type_display }}</span></td>
               <td class="text-end">{{ pred.area_m2|floatformat:0 }} m²</td>
-              <td class="text-end fw-bold text-primary">
-                {{ pred.predicted_price_mad|floatformat:0 }}
-              </td>
+              <td class="text-end fw-bold text-primary">{{ pred.predicted_price_mad|floatformat:0 }}</td>
               <td class="text-end">{{ pred.price_per_m2_mad|floatformat:0 }}</td>
               <td class="text-center">
                 <a href="{% url 'predictions:result' pred.pk %}"

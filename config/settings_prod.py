@@ -70,3 +70,18 @@ LOGGING = {
         'properties': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
     },
 }
+
+# ─── Email production ────────────────────────────────────────────────────────
+# Si EMAIL_HOST_USER est défini → SMTP, sinon → console (logs Render)
+_email_user = config('EMAIL_HOST_USER', default='')
+if _email_user:
+    EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST          = config('EMAIL_HOST', default='smtp.gmail.com')
+    EMAIL_PORT          = config('EMAIL_PORT', default=587, cast=int)
+    EMAIL_USE_TLS       = True
+    EMAIL_HOST_USER     = _email_user
+    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+    DEFAULT_FROM_EMAIL  = f'Orchiimmo <{_email_user}>'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = 'Orchiimmo <noreply@orchiimmo.ma>'
