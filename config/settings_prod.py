@@ -38,13 +38,15 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # ─── Sécurité HTTPS ───────────────────────────────────────────────────────────
+# Render / Railway gèrent SSL en amont (reverse proxy)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT      = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
-SESSION_COOKIE_SECURE    = True
-CSRF_COOKIE_SECURE       = True
+# SECURE_SSL_REDIRECT contrôlé par variable d'env (False sur Render, True ailleurs)
+SECURE_SSL_REDIRECT   = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE    = True
 
-# ─── Scraping auto désactivé en production (Railway peut le garder activé) ───
-SCRAPE_AUTO_ENABLED = config('SCRAPE_AUTO_ENABLED', default=True, cast=bool)
+# ─── Scraping auto (Render free dort, mais fonctionne quand actif) ────────────
+SCRAPE_AUTO_ENABLED = config('SCRAPE_AUTO_ENABLED', default=False, cast=bool)
 
 # ─── Logs production ─────────────────────────────────────────────────────────
 LOGGING = {
