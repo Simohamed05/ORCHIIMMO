@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% block title %}Mon Profil — {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Colonne gauche : infos profil -->
+  <div class="col-md-4">
+    <div class="card mb-4">
+      <div class="card-body text-center p-4">
+        <div class="avatar-circle mb-3 mx-auto">
+          <i class="bi bi-person-fill text-primary" style="font-size:3rem;"></i>
+        </div>
+        <h5 class="fw-bold mb-0">{{ user.get_full_name|default:user.username }}</h5>
+        <p class="text-muted">@{{ user.username }}</p>
+        <p class="text-muted small">{{ user.email }}</p>
+        <hr>
+        <div class="row text-center g-2">
+          <div class="col-6">
+            <div class="fw-bold text-primary fs-4">{{ predictions|length }}</div>
+            <small class="text-muted">
+              <span data-lang-fr>Estimations</span>
+              <span data-lang-ar>التقديرات</span>
+            </small>
+          </div>
+          <div class="col-6">
+            <div class="fw-bold text-warning fs-4">
+              {% if user.date_joined %}
+                {{ user.date_joined|date:"Y" }}
+              {% else %}2026{% endif %}
+            </div>
+            <small class="text-muted">
+              <span data-lang-fr>Membre depuis</span>
+              <span data-lang-ar>عضو منذ</span>
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modifier le profil -->
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0">
+          <i class="bi bi-pencil me-2"></i>
+          <span data-lang-fr>Modifier mon Profil</span>
+          <span data-lang-ar>تعديل الملف الشخصي</span>
+        </h6>
+      </div>
+      <div class="card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label">
+              <span data-lang-fr>Téléphone</span>
+              <span data-lang-ar>الهاتف</span>
+            </label>
+            <input type="tel" name="phone" class="form-control"
+                   value="{{ form.phone.value|default:'' }}"
+                   placeholder="+212 6xx xxx xxx">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">
+              <span data-lang-fr>Ville</span>
+              <span data-lang-ar>المدينة</span>
+            </label>
+            <input type="text" name="city" class="form-control"
+                   value="{{ form.city.value|default:'' }}"
+                   placeholder="ex: Casablanca">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">
+              <span data-lang-fr>Bio</span>
+              <span data-lang-ar>نبذة عنك</span>
+            </label>
+            <textarea name="bio" class="form-control" rows="3"
+                      placeholder="Quelques mots sur vous...">{{ form.bio.value|default:'' }}</textarea>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check2 me-1"></i>
+            <span data-lang-fr>Enregistrer</span>
+            <span data-lang-ar>حفظ</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Colonne droite : historique estimations -->
+  <div class="col-md-8">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">
+        <i class="bi bi-clock-history text-primary me-2"></i>
+        <span data-lang-fr>Mes Dernières Estimations</span>
+        <span data-lang-ar>آخر تقديراتي</span>
+      </h5>
+      <a href="{% url 'predictions:history' %}" class="btn btn-sm btn-outline-primary">
+        <span data-lang-fr>Voir tout</span>
+        <span data-lang-ar>عرض الكل</span>
+      </a>
+    </div>
+
+    {% if predictions %}
+      <div class="row g-3">
+        {% for pred in predictions %}
+        <div class="col-12">
+          <div class="card prediction-mini">
+            <div class="card-body py-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <span class="badge bg-primary me-2">{{ pred.property_type }}</span>
+                  <strong>{{ pred.city }}</strong>
+                  {% if pred.district %}<span class="text-muted"> — {{ pred.district }}</span>{% endif %}
+                </div>
+                <small class="text-muted">{{ pred.created_at|date:"d/m/Y" }}</small>
+              </div>
+              <div class="mt-2 d-flex gap-4">
+                <div>
+                  <div class="fw-bold text-primary">
+                    {{ pred.predicted_price_mad|floatformat:0 }} DH
+                  </div>
+                  <small class="text-muted">
+                    <span data-lang-fr>Prix estimé</span>
+                    <span data-lang-ar>السعر المقدر</span>
+                  </small>
+                </div>
+                <div>
+                  <div class="fw-bold">{{ pred.area_m2|floatformat:0 }} m²</div>
+                  <small class="text-muted">
+                    <span data-lang-fr>Surface</span>
+                    <span data-lang-ar>المساحة</span>
+                  </small>
+                </div>
+                <div>
+                  <div class="fw-bold">{{ pred.bedrooms }} ch.</div>
+                  <small class="text-muted">
+                    <span data-lang-fr>Chambres</span>
+                    <span data-lang-ar>الغرف</span>
+                  </small>
+                </div>
+              </div>
+              <div class="mt-2">
+                <a href="{% url 'predictions:result' pred.pk %}" class="btn btn-sm btn-outline-primary">
+                  <span data-lang-fr>Voir le résultat</span>
+                  <span data-lang-ar>عرض النتيجة</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-calculator" style="font-size:3rem;"></i>
+        <p class="mt-3">
+          <span data-lang-fr>Vous n'avez pas encore fait d'estimation.</span>
+          <span data-lang-ar>لم تقم بأي تقدير بعد.</span>
+        </p>
+        <a href="{% url 'predictions:form' %}" class="btn btn-primary">
+          <i class="bi bi-calculator me-2"></i>
+          <span data-lang-fr>Faire ma première estimation</span>
+          <span data-lang-ar>أول تقدير لي</span>
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

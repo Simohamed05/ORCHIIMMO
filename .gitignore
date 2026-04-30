@@ -1,0 +1,58 @@
+# Django
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+db.sqlite3
+*.log
+local_settings.py
+media/
+
+# Environnement virtuel
+venv/
+env/
+.env
+.env.local
+.env.*.local
+
+# Distribution / packaging
+.eggs/
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Tests
+.coverage
+htmlcov/
+.pytest_cache/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Fichiers statiques collectés (générés en prod)
+staticfiles/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Données brutes (trop volumineuses)
+Phase1_BI/
+
+# Exclure les CSV sauf le dataset ML (nécessaire pour les comparables)
+*.csv
+!ml/data/apparts_maroc_ml.csv
+
+# Garder les artefacts ML (nécessaires pour les prédictions)
+!ml/models/best_model.pkl
+!ml/models/model_metrics.json
+!ml/models/feature_importance.csv

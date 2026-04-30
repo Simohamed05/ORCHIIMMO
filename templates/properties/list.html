@@ -1,0 +1,652 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Catalogue — {{ db_stats.total }} biens au Maroc{% endblock %}
+
+{% block content %}
+
+<!-- ── Bandeau scraping temps réel ──────────────────────────────────────────── -->
+{% if user.is_authenticated %}
+<div class="card mb-4 border-0" id="scrape-panel" style="background:linear-gradient(135deg,#0f1c3a,#1a2d5a);border-radius:16px;">
+  <div class="card-body py-3 px-4">
+    <div class="row align-items-center g-3">
+
+      <!-- Titre + stats DB -->
+      <div class="col-lg-5">
+        <div class="d-flex align-items-center gap-3">
+          <div class="scrape-icon-pulse">
+            <i class="bi bi-broadcast fs-3 text-primary"></i>
+          </div>
+          <div>
+            <h6 class="mb-0 fw-bold text-white">
+              <span data-lang-fr>Scraping Temps Réel</span>
+              <span data-lang-ar>استخراج البيانات المباشر</span>
+            </h6>
+            <small class="text-muted">
+              <span data-lang-fr>
+                <span id="db-total">{{ db_stats.total }}</span> annonces •
+                <span id="db-villes">{{ db_stats.villes }}</span> villes •
+                <span id="db-sources">{{ db_stats.sources }}</span> sources
+              </span>
+              <span data-lang-ar>
+                <span id="db-total-ar">{{ db_stats.total }}</span> إعلان •
+                <span id="db-villes-ar">{{ db_stats.villes }}</span> مدينة •
+                <span id="db-sources-ar">{{ db_stats.sources }}</span> مصادر
+              </span>
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sélection sources + pages -->
+      <div class="col-lg-4">
+        <div class="d-flex gap-2 flex-wrap">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" id="src-mubawab"
+                   value="mubawab" checked>
+            <label class="form-check-label text-white small" for="src-mubawab">
+              Mubawab
+            </label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" id="src-sarouty"
+                   value="sarouty" checked>
+            <label class="form-check-label text-white small" for="src-sarouty">
+              Sarouty
+            </label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" id="src-avito"
+                   value="avito" checked>
+            <label class="form-check-label text-white small" for="src-avito">
+              Avito
+            </label>
+          </div>
+          <select id="scrape-pages" class="form-select form-select-sm"
+                  style="width:auto;background:#1e2d4a;color:#e2e8f0;border-color:#334155;">
+            <option value="2">2 pages</option>
+            <option value="3" selected>3 pages</option>
+            <option value="5">5 pages</option>
+            <option value="10">10 pages</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Bouton lancer -->
+      <div class="col-lg-3 text-lg-end">
+        <button id="btn-scrape" class="btn btn-primary px-4" onclick="startScrape()">
+          <i class="bi bi-play-fill me-1"></i>
+          <span data-lang-fr>Lancer le Scraping</span>
+          <span data-lang-ar>ابدأ الاستخراج</span>
+        </button>
+        <button id="btn-stop" class="btn btn-danger px-4 d-none" onclick="stopScrape()">
+          <i class="bi bi-stop-fill me-1"></i>
+          <span data-lang-fr>Arrêter</span>
+          <span data-lang-ar>إيقاف</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Barre de progression + compteurs -->
+    <div id="scrape-progress" class="mt-3 d-none">
+      <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+        <small id="scrape-status" class="text-info">
+          <i class="bi bi-arrow-repeat spin me-1"></i>
+          <span data-lang-fr>Connexion…</span>
+          <span data-lang-ar>جارٍ الاتصال…</span>
+        </small>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-success">
+            +<span id="count-new">0</span>
+            <span data-lang-fr> nouvelles</span>
+            <span data-lang-ar> جديد</span>
+          </span>
+          <span class="badge bg-secondary">
+            <span id="count-dup">0</span>
+            <span data-lang-fr> doublons</span>
+            <span data-lang-ar> مكرر</span>
+          </span>
+          <!-- Bouton actualiser (visible après fin de scraping) -->
+          <a id="btn-refresh-grid" href="{% url 'properties:list' %}?sort=recent"
+             class="btn btn-success btn-sm d-none">
+            <i class="bi bi-arrow-clockwise me-1"></i>
+            <span data-lang-fr>Voir les nouvelles annonces</span>
+            <span data-lang-ar>عرض الإعلانات الجديدة</span>
+          </a>
+        </div>
+      </div>
+      <div class="progress" style="height:4px;">
+        <div id="scrape-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+             style="width:100%"></div>
+      </div>
+    </div>
+
+    <!-- Feed live -->
+    <div id="scrape-feed" class="mt-3 d-none"
+         style="max-height:280px;overflow-y:auto;border-radius:8px;">
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Layout principal ──────────────────────────────────────────────────────── -->
+<div class="row g-4">
+
+  <!-- ── Colonne filtres ──────────────────────────────────────────────────────── -->
+  <div class="col-lg-3">
+    <div class="card sticky-top" style="top:80px;">
+      <div class="card-header">
+        <h6 class="mb-0">
+          <i class="bi bi-funnel me-2"></i>
+          <span data-lang-fr>Filtres</span>
+          <span data-lang-ar>تصفية</span>
+        </h6>
+      </div>
+      <div class="card-body">
+        <form method="get" id="filter-form">
+
+          <!-- Ville -->
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">
+              <i class="bi bi-geo-alt me-1"></i>
+              <span data-lang-fr>Ville</span>
+              <span data-lang-ar>المدينة</span>
+            </label>
+            <select name="city" class="form-select form-select-sm">
+              <option value="">
+                <span data-lang-fr>Toutes les villes</span>
+                <span data-lang-ar>كل المدن</span>
+              </option>
+              {% for v in villes %}
+                <option value="{{ v }}" {% if f_city == v %}selected{% endif %}>{{ v }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Type -->
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">
+              <i class="bi bi-house me-1"></i>
+              <span data-lang-fr>Type de bien</span>
+              <span data-lang-ar>نوع العقار</span>
+            </label>
+            <select name="type" class="form-select form-select-sm">
+              <option value="">
+                <span data-lang-fr>Tous les types</span>
+                <span data-lang-ar>كل الأنواع</span>
+              </option>
+              <option value="apartment" {% if f_type == 'apartment' %}selected{% endif %}>
+                <span data-lang-fr>Appartement</span>
+                <span data-lang-ar>شقة</span>
+              </option>
+              <option value="villa"     {% if f_type == 'villa'     %}selected{% endif %}>
+                Villa / Maison
+              </option>
+              <option value="riad"      {% if f_type == 'riad'      %}selected{% endif %}>Riad</option>
+              <option value="land"      {% if f_type == 'land'      %}selected{% endif %}>
+                <span data-lang-fr>Terrain</span>
+                <span data-lang-ar>أرض</span>
+              </option>
+              <option value="office"    {% if f_type == 'office'    %}selected{% endif %}>
+                <span data-lang-fr>Bureau</span>
+                <span data-lang-ar>مكتب</span>
+              </option>
+              <option value="other"     {% if f_type == 'other'     %}selected{% endif %}>
+                <span data-lang-fr>Autre</span>
+                <span data-lang-ar>أخرى</span>
+              </option>
+            </select>
+          </div>
+
+          <!-- Prix MAD -->
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">
+              <i class="bi bi-cash-stack me-1"></i>
+              <span data-lang-fr>Prix (DH)</span>
+              <span data-lang-ar>السعر (درهم)</span>
+            </label>
+            <div class="input-group input-group-sm mb-1">
+              <span class="input-group-text">Min</span>
+              <input type="number" name="price_min" class="form-control"
+                     value="{{ f_pmin }}" placeholder="0" min="0" step="50000">
+            </div>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Max</span>
+              <input type="number" name="price_max" class="form-control"
+                     value="{{ f_pmax }}" placeholder="∞" min="0" step="50000">
+            </div>
+          </div>
+
+          <!-- Tri -->
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">
+              <i class="bi bi-sort-down me-1"></i>
+              <span data-lang-fr>Trier par</span>
+              <span data-lang-ar>ترتيب حسب</span>
+            </label>
+            <select name="sort" class="form-select form-select-sm">
+              <option value="price_mad"  {% if f_sort == 'price_mad'  %}selected{% endif %}>
+                <span data-lang-fr>Prix croissant</span>
+                <span data-lang-ar>السعر تصاعدي</span>
+              </option>
+              <option value="price_desc" {% if f_sort == 'price_desc' %}selected{% endif %}>
+                <span data-lang-fr>Prix décroissant</span>
+                <span data-lang-ar>السعر تنازلي</span>
+              </option>
+              <option value="area_m2"    {% if f_sort == 'area_m2'    %}selected{% endif %}>
+                <span data-lang-fr>Surface</span>
+                <span data-lang-ar>المساحة</span>
+              </option>
+              <option value="recent"     {% if f_sort == 'recent'     %}selected{% endif %}>
+                <span data-lang-fr>Récent</span>
+                <span data-lang-ar>الأحدث</span>
+              </option>
+            </select>
+          </div>
+
+          <!-- Opportunités -->
+          <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" name="opportunity"
+                   id="opport" value="1" {% if f_opport %}checked{% endif %}>
+            <label class="form-check-label small" for="opport">
+              <i class="bi bi-star-fill text-warning me-1"></i>
+              <span data-lang-fr>Opportunités seulement</span>
+              <span data-lang-ar>الفرص فقط</span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 btn-sm">
+            <i class="bi bi-search me-1"></i>
+            <span data-lang-fr>Appliquer</span>
+            <span data-lang-ar>بحث</span>
+          </button>
+          <a href="{% url 'properties:list' %}"
+             class="btn btn-outline-secondary w-100 btn-sm mt-2">
+            <i class="bi bi-x-circle me-1"></i>
+            <span data-lang-fr>Réinitialiser</span>
+            <span data-lang-ar>إعادة تعيين</span>
+          </a>
+        </form>
+      </div>
+
+      <!-- Stats rapides -->
+      {% if stats.prix_moyen %}
+      <div class="card-footer text-muted small">
+        <div class="d-flex justify-content-between mb-1">
+          <span data-lang-fr>Prix moyen :</span>
+          <span data-lang-ar>السعر المتوسط:</span>
+          <strong class="text-primary">{{ stats.prix_moyen|floatformat:0 }} DH</strong>
+        </div>
+        <div class="d-flex justify-content-between mb-1">
+          <span data-lang-fr>Prix min :</span>
+          <span data-lang-ar>أدنى سعر:</span>
+          <strong>{{ stats.prix_min|floatformat:0 }} DH</strong>
+        </div>
+        <div class="d-flex justify-content-between">
+          <span data-lang-fr>Prix max :</span>
+          <span data-lang-ar>أعلى سعر:</span>
+          <strong>{{ stats.prix_max|floatformat:0 }} DH</strong>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Liste des biens ──────────────────────────────────────────────────────── -->
+  <div class="col-lg-9">
+
+    <!-- En-tête résultats -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">
+        <i class="bi bi-building me-2"></i>
+        <span data-lang-fr>
+          <strong>{{ total }}</strong> bien{% if total > 1 %}s{% endif %}
+          {% if f_city %} à <strong>{{ f_city }}</strong>{% endif %}
+        </span>
+        <span data-lang-ar>
+          <strong>{{ total }}</strong> عقار{% if f_city %} في <strong>{{ f_city }}</strong>{% endif %}
+        </span>
+      </h5>
+      <small class="text-muted">
+        <span data-lang-fr>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        <span data-lang-ar>صفحة {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      </small>
+    </div>
+
+    {% if page_obj %}
+      <div class="row g-3" id="properties-grid">
+        {% for prop in page_obj %}
+        <div class="col-md-6 col-xl-4">
+          <a href="{% url 'properties:detail' prop.pk %}" class="text-decoration-none">
+            <div class="card property-card h-100">
+              <div class="card-body p-3">
+
+                <!-- Badges -->
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <span class="badge bg-secondary">{{ prop.get_property_type_display }}</span>
+                  <div class="d-flex gap-1">
+                    <span class="badge" style="background:#1e3a5f;color:#7dd3fc;font-size:0.7rem;">
+                      {{ prop.source }}
+                    </span>
+                    {% if prop.is_opportunity %}
+                      <span class="badge bg-warning text-dark">
+                        <i class="bi bi-star-fill me-1"></i>
+                        <span data-lang-fr>Opportunité</span>
+                        <span data-lang-ar>فرصة</span>
+                      </span>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Ville -->
+                <h6 class="fw-bold text-white mb-1">
+                  {{ prop.city }}
+                  {% if prop.district %}
+                    <small class="text-muted fw-normal">— {{ prop.district }}</small>
+                  {% endif %}
+                </h6>
+
+                {% if prop.title %}
+                  <p class="text-muted small mb-2 text-truncate">{{ prop.title }}</p>
+                {% endif %}
+
+                <!-- Prix MAD -->
+                <div class="prix-card mb-2">
+                  {% if prop.price_mad %}
+                    {{ prop.price_mad|floatformat:0 }} <span style="font-size:.8em;opacity:.7;">DH</span>
+                  {% else %}
+                    <span class="text-muted">— DH</span>
+                  {% endif %}
+                </div>
+
+                <!-- Caractéristiques -->
+                <div class="d-flex gap-3 text-muted small flex-wrap">
+                  {% if prop.area_m2 %}
+                    <span><i class="bi bi-rulers me-1"></i>{{ prop.area_m2|floatformat:0 }} m²</span>
+                  {% endif %}
+                  {% if prop.bedrooms is not None %}
+                    <span><i class="bi bi-door-closed me-1"></i>{{ prop.bedrooms }}
+                      <span data-lang-fr>ch.</span>
+                      <span data-lang-ar>غرفة</span>
+                    </span>
+                  {% endif %}
+                  {% if prop.price_per_m2_mad %}
+                    <span><i class="bi bi-cash me-1"></i>{{ prop.price_per_m2_mad|floatformat:0 }} DH/m²</span>
+                  {% endif %}
+                </div>
+
+                <!-- Score opportunité -->
+                {% if prop.opportunity_score %}
+                  <div class="mt-2">
+                    <small class="text-warning">
+                      <i class="bi bi-graph-up me-1"></i>Score : {{ prop.opportunity_score|floatformat:2 }}
+                    </small>
+                  </div>
+                {% endif %}
+
+              </div>
+              <div class="card-footer py-2 d-flex justify-content-between align-items-center">
+                <small class="text-muted">
+                  {% if prop.scraped_at %}{{ prop.scraped_at }}{% endif %}
+                </small>
+                <small class="text-primary fw-semibold">
+                  <span data-lang-fr>Voir →</span>
+                  <span data-lang-ar>عرض →</span>
+                </small>
+              </div>
+            </div>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Pagination -->
+      {% if page_obj.has_other_pages %}
+      <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link"
+                 href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">
+                <i class="bi bi-chevron-left"></i>
+              </a>
+            </li>
+          {% endif %}
+
+          {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+              <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+              <li class="page-item">
+                <a class="page-link"
+                   href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ num }}">{{ num }}</a>
+              </li>
+            {% endif %}
+          {% endfor %}
+
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link"
+                 href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">
+                <i class="bi bi-chevron-right"></i>
+              </a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
+
+    {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-search" style="font-size:3rem;"></i>
+        <h5 class="mt-3">
+          <span data-lang-fr>Aucun bien trouvé</span>
+          <span data-lang-ar>لم يُعثر على عقارات</span>
+        </h5>
+        <p>
+          <span data-lang-fr>Essayez d'élargir vos critères ou lancez un scraping.</span>
+          <span data-lang-ar>جرب توسيع معاييرك أو ابدأ الاستخراج.</span>
+        </p>
+        <a href="{% url 'properties:list' %}" class="btn btn-outline-primary">
+          <span data-lang-fr>Voir tous les biens</span>
+          <span data-lang-ar>عرض كل العقارات</span>
+        </a>
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ══════════════════════════════════════════════════════
+   SCRAPING TEMPS RÉEL — Server-Sent Events
+   ══════════════════════════════════════════════════════ */
+
+let evtSource = null;
+
+function startScrape() {
+  // Sources sélectionnées
+  const sources = ['mubawab','sarouty','avito']
+    .filter(s => document.getElementById('src-' + s)?.checked)
+    .join(',');
+
+  if (!sources) {
+    alert('Sélectionnez au moins une source.');
+    return;
+  }
+
+  const pages = document.getElementById('scrape-pages').value;
+
+  // UI → état "en cours"
+  document.getElementById('btn-scrape').classList.add('d-none');
+  document.getElementById('btn-stop').classList.remove('d-none');
+  document.getElementById('scrape-progress').classList.remove('d-none');
+  document.getElementById('scrape-feed').classList.remove('d-none');
+  document.getElementById('scrape-feed').innerHTML = '';
+  document.getElementById('count-new').textContent = '0';
+  document.getElementById('count-dup').textContent = '0';
+
+  const url = `{% url 'properties:scrape_stream' %}?sources=${encodeURIComponent(sources)}&pages=${pages}`;
+  evtSource  = new EventSource(url);
+
+  evtSource.addEventListener('status', e => {
+    const d = JSON.parse(e.data);
+    setStatus('<i class="bi bi-arrow-repeat spin me-1"></i>' + d.msg);
+  });
+
+  evtSource.addEventListener('listing', e => {
+    const d = JSON.parse(e.data);
+    document.getElementById('count-new').textContent = d.total_new;
+    document.getElementById('count-dup').textContent = d.total_dup;
+
+    if (d.is_new) {
+      prependListing(d);
+    }
+  });
+
+  evtSource.addEventListener('error_event', e => {
+    const d = JSON.parse(e.data);
+    setStatus('<i class="bi bi-exclamation-triangle text-warning me-1"></i>' + (d.msg || 'Erreur'));
+  });
+
+  evtSource.addEventListener('done', e => {
+    const d = JSON.parse(e.data);
+    const newCount = parseInt(document.getElementById('count-new').textContent) || 0;
+    const msg = newCount > 0
+      ? `<i class="bi bi-check-circle text-success me-1"></i>${d.msg} — ${newCount} nouvelle(s) annonce(s) enregistrée(s) en base`
+      : `<i class="bi bi-check-circle text-success me-1"></i>${d.msg}`;
+    setStatus(msg);
+    stopScrape(true);
+    // Rafraîchir les stats DB
+    refreshStats();
+    // Afficher le bouton "Voir les nouvelles annonces" si il y en a
+    if (newCount > 0) {
+      document.getElementById('btn-refresh-grid').classList.remove('d-none');
+      // Recharger automatiquement après 4 secondes
+      setTimeout(() => {
+        window.location.href = "{% url 'properties:list' %}?sort=recent";
+      }, 4000);
+    }
+  });
+
+  evtSource.onerror = () => {
+    setStatus('<i class="bi bi-wifi-off text-danger me-1"></i>Connexion interrompue.');
+    stopScrape(true);
+  };
+}
+
+function stopScrape(done = false) {
+  if (evtSource) {
+    evtSource.close();
+    evtSource = null;
+  }
+  document.getElementById('btn-scrape').classList.remove('d-none');
+  document.getElementById('btn-stop').classList.add('d-none');
+
+  // Arrêter l'animation de la barre
+  const bar = document.getElementById('scrape-bar');
+  bar.classList.remove('progress-bar-animated');
+  bar.classList.toggle('bg-success', done);
+  bar.classList.toggle('bg-primary', !done);
+  if (done) bar.style.width = '100%';
+}
+
+function setStatus(html) {
+  document.getElementById('scrape-status').innerHTML = html;
+}
+
+function prependListing(d) {
+  const feed  = document.getElementById('scrape-feed');
+  const price = Number(d.price_mad || 0).toLocaleString('fr-MA');
+  const area  = d.area_m2 ? `${Math.round(d.area_m2)} m² · ` : '';
+  const oppt  = d.is_opportunity
+    ? '<span class="badge bg-warning text-dark ms-1"><i class="bi bi-star-fill"></i></span>'
+    : '';
+  const link  = d.url
+    ? `<a href="${d.url}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary py-0 ms-2"><i class="bi bi-box-arrow-up-right"></i></a>`
+    : '';
+
+  const srcColors = {
+    mubawab: '#2563eb', sarouty: '#7c3aed', avito: '#16a34a'
+  };
+  const srcColor = srcColors[d.source] || '#475569';
+
+  const html = `
+    <div class="scrape-item d-flex align-items-center gap-2 px-3 py-2"
+         style="border-bottom:1px solid #1e2d4a;animation:fadeInDown .3s ease;">
+      <span class="badge" style="background:${srcColor};min-width:60px;text-align:center;">${d.source}</span>
+      <div class="flex-grow-1 overflow-hidden">
+        <span class="fw-semibold text-white">${d.city}${d.district ? ' · ' + d.district : ''}</span>
+        ${oppt}
+        <br>
+        <small class="text-muted">${area}<strong class="text-primary">${price} DH</strong></small>
+      </div>
+      ${link}
+    </div>`;
+
+  feed.insertAdjacentHTML('afterbegin', html);
+
+  // Limiter à 50 éléments pour la perfo
+  const items = feed.querySelectorAll('.scrape-item');
+  if (items.length > 50) items[items.length - 1].remove();
+}
+
+function refreshStats() {
+  fetch('{% url "properties:scrape_stats" %}')
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('db-total').textContent    = d.total?.toLocaleString('fr-MA') || '—';
+      document.getElementById('db-villes').textContent   = d.nb_villes || '—';
+      document.getElementById('db-sources').textContent  = d.nb_sources || '—';
+      document.getElementById('db-total-ar').textContent = d.total?.toLocaleString('ar-MA') || '—';
+      document.getElementById('db-villes-ar').textContent = d.nb_villes || '—';
+      document.getElementById('db-sources-ar').textContent = d.nb_sources || '—';
+    })
+    .catch(() => {});
+}
+
+/* Rafraîchir automatiquement la grille après scraping */
+function reloadGrid() {
+  window.location.reload();
+}
+
+/* Auto-refresh toutes les 30s si scraping actif */
+setInterval(() => {
+  if (evtSource) refreshStats();
+}, 30_000);
+</script>
+
+<style>
+@keyframes fadeInDown {
+  from { opacity:0; transform:translateY(-8px); }
+  to   { opacity:1; transform:translateY(0);    }
+}
+.spin {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.scrape-icon-pulse i {
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50%      { opacity:0.4; }
+}
+#scrape-feed {
+  background: #0a0f1e;
+  border: 1px solid #1e2d4a;
+  border-radius: 8px;
+}
+.prix-card {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent, #4895EF);
+  letter-spacing: -.02em;
+}
+</style>
+{% endblock %}

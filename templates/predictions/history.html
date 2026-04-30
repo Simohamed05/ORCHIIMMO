@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% block title %}Historique des Estimations — Orchiimmo{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0">
+    <i class="bi bi-clock-history text-primary me-2"></i>
+    <span data-lang-fr>Mes Estimations</span>
+    <span data-lang-ar>تقديراتي</span>
+  </h2>
+  <a href="{% url 'predictions:form' %}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i>
+    <span data-lang-fr>Nouvelle estimation</span>
+    <span data-lang-ar>تقدير جديد</span>
+  </a>
+</div>
+
+{% if predictions %}
+
+  <!-- Stats rapides -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card text-center">
+        <div class="card-body py-3">
+          <div class="fs-4 fw-bold text-primary">{{ predictions|length }}</div>
+          <small class="text-muted">
+            <span data-lang-fr>Total estimations</span>
+            <span data-lang-ar>إجمالي التقديرات</span>
+          </small>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card text-center">
+        <div class="card-body py-3">
+          <div class="fs-4 fw-bold text-warning">
+            {{ predictions.0.predicted_price_mad|floatformat:0 }} DH
+          </div>
+          <small class="text-muted">
+            <span data-lang-fr>Dernière estimation</span>
+            <span data-lang-ar>آخر تقدير</span>
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tableau des estimations -->
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>
+                <span data-lang-fr>Date</span>
+                <span data-lang-ar>التاريخ</span>
+              </th>
+              <th>
+                <span data-lang-fr>Ville</span>
+                <span data-lang-ar>المدينة</span>
+              </th>
+              <th>
+                <span data-lang-fr>Type</span>
+                <span data-lang-ar>النوع</span>
+              </th>
+              <th class="text-end">
+                <span data-lang-fr>Surface</span>
+                <span data-lang-ar>المساحة</span>
+              </th>
+              <th class="text-end">
+                <span data-lang-fr>Prix estimé (DH)</span>
+                <span data-lang-ar>السعر المقدر (DH)</span>
+              </th>
+              <th class="text-end">
+                <span data-lang-fr>Prix/m² (DH)</span>
+                <span data-lang-ar>السعر/م² (DH)</span>
+              </th>
+              <th class="text-center">
+                <span data-lang-fr>Action</span>
+                <span data-lang-ar>إجراء</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for pred in predictions %}
+            <tr>
+              <td class="text-muted small">{{ pred.created_at|date:"d/m/Y H:i" }}</td>
+              <td>
+                <strong>{{ pred.city }}</strong>
+                {% if pred.district %}
+                  <br><small class="text-muted">{{ pred.district }}</small>
+                {% endif %}
+              </td>
+              <td><span class="badge bg-secondary">{{ pred.property_type }}</span></td>
+              <td class="text-end">{{ pred.area_m2|floatformat:0 }} m²</td>
+              <td class="text-end fw-bold text-primary">
+                {{ pred.predicted_price_mad|floatformat:0 }}
+              </td>
+              <td class="text-end">{{ pred.price_per_m2_mad|floatformat:0 }}</td>
+              <td class="text-center">
+                <a href="{% url 'predictions:result' pred.pk %}"
+                   class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+{% else %}
+  <div class="text-center py-5">
+    <i class="bi bi-calculator text-muted" style="font-size:4rem;"></i>
+    <h4 class="mt-3 text-muted">
+      <span data-lang-fr>Aucune estimation pour l'instant</span>
+      <span data-lang-ar>لا توجد تقديرات بعد</span>
+    </h4>
+    <p class="text-muted">
+      <span data-lang-fr>Faites votre première estimation et elle apparaîtra ici.</span>
+      <span data-lang-ar>قم بأول تقدير وسيظهر هنا.</span>
+    </p>
+    <a href="{% url 'predictions:form' %}" class="btn btn-primary btn-lg mt-2">
+      <i class="bi bi-calculator me-2"></i>
+      <span data-lang-fr>Estimer un Bien</span>
+      <span data-lang-ar>تقدير عقار</span>
+    </a>
+  </div>
+{% endif %}
+
+{% endblock %}

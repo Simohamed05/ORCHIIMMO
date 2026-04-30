@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+{% block title %}Orchiimmo — Plateforme Immobilière Maroc{% endblock %}
+
+{% block content %}
+<!-- ── HERO ────────────────────────────────────────────────────────────────── -->
+<div class="hero-section text-center py-5 mb-5 rounded-4">
+  <div class="py-3">
+    <h1 class="display-4 fw-bold mb-3">
+      <span class="text-primary">ORCHI</span>IMMO
+    </h1>
+    <p class="lead mb-2">
+      <span data-lang-fr>Plateforme d'analyse immobilière <strong>100% Maroc</strong></span>
+      <span data-lang-ar>منصة تحليل العقارات <strong>100% المغرب</strong></span>
+    </p>
+    <p class="text-muted mb-4">
+      <span data-lang-fr>Estimez le prix de votre bien en <strong class="text-warning">MAD</strong>,
+      explorez le marché et découvrez les meilleures opportunités.</span>
+      <span data-lang-ar>قدّر سعر عقارك بالدرهم المغربي <strong class="text-warning">MAD</strong>،
+      استكشف السوق واكتشف أفضل الفرص العقارية.</span>
+    </p>
+    <div class="d-flex justify-content-center gap-3 flex-wrap">
+      <a href="{% url 'properties:list' %}" class="btn btn-primary btn-lg px-5">
+        <i class="bi bi-search me-2"></i>
+        <span data-lang-fr>Explorer le Catalogue</span>
+        <span data-lang-ar>استكشف الفهرس</span>
+      </a>
+      {% if user.is_authenticated %}
+        <a href="{% url 'predictions:form' %}" class="btn btn-outline-light btn-lg px-5">
+          <i class="bi bi-calculator me-2"></i>
+          <span data-lang-fr>Estimer mon Bien</span>
+          <span data-lang-ar>قدّر عقاري</span>
+        </a>
+      {% else %}
+        <a href="{% url 'accounts:register' %}" class="btn btn-outline-light btn-lg px-5">
+          <i class="bi bi-person-plus me-2"></i>
+          <span data-lang-fr>Commencer Gratuitement</span>
+          <span data-lang-ar>ابدأ مجاناً</span>
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ── KPIs ────────────────────────────────────────────────────────────────── -->
+<div class="row g-4 mb-5 text-center">
+  <div class="col-6 col-md-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body py-4">
+        <div class="kpi-value text-primary">8 000+</div>
+        <div class="kpi-label">
+          <span data-lang-fr>Annonces Maroc</span>
+          <span data-lang-ar>إعلانات المغرب</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body py-4">
+        <div class="kpi-value text-warning">331</div>
+        <div class="kpi-label">
+          <span data-lang-fr>Villes couvertes</span>
+          <span data-lang-ar>مدن مشمولة</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body py-4">
+        <div class="kpi-value text-success">1,35 M</div>
+        <div class="kpi-label">
+          <span data-lang-fr>Prix médian (DH)</span>
+          <span data-lang-ar>السعر الوسيط (درهم)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body py-4">
+        <div class="kpi-value text-danger">12%</div>
+        <div class="kpi-label">
+          <span data-lang-fr>Opportunités détectées</span>
+          <span data-lang-ar>فرص مكتشفة</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FONCTIONNALITÉS ──────────────────────────────────────────────────────── -->
+<h2 class="text-center mb-4">
+  <span data-lang-fr>Tout ce dont vous avez besoin</span>
+  <span data-lang-ar>كل ما تحتاجه</span>
+</h2>
+<div class="row g-4 mb-5">
+
+  <!-- Estimation ML -->
+  <div class="col-md-4">
+    <div class="card feature-card h-100">
+      <div class="card-body p-4">
+        <div class="feature-icon mb-3">
+          <i class="bi bi-calculator-fill text-primary"></i>
+        </div>
+        <h5 class="fw-bold">
+          <span data-lang-fr>Estimation ML</span>
+          <span data-lang-ar>تقدير بالذكاء الاصطناعي</span>
+        </h5>
+        <p class="text-muted">
+          <span data-lang-fr>Notre moteur IA prédit le prix de votre bien en MAD
+          avec un intervalle de confiance à 90%, basé sur
+          des milliers d'appartements réels.</span>
+          <span data-lang-ar>يتنبأ محرك الذكاء الاصطناعي بسعر عقارك بالدرهم
+          بنطاق ثقة 90%، استناداً إلى آلاف الشقق الحقيقية.</span>
+        </p>
+        {% if user.is_authenticated %}
+          <a href="{% url 'predictions:form' %}" class="btn btn-sm btn-primary">
+            <span data-lang-fr>Estimer maintenant →</span>
+            <span data-lang-ar>قدّر الآن ←</span>
+          </a>
+        {% else %}
+          <a href="{% url 'accounts:register' %}" class="btn btn-sm btn-outline-primary">
+            <span data-lang-fr>S'inscrire pour accéder →</span>
+            <span data-lang-ar>سجّل للوصول ←</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Catalogue -->
+  <div class="col-md-4">
+    <div class="card feature-card h-100">
+      <div class="card-body p-4">
+        <div class="feature-icon mb-3">
+          <i class="bi bi-search text-warning"></i>
+        </div>
+        <h5 class="fw-bold">
+          <span data-lang-fr>Catalogue de Biens</span>
+          <span data-lang-ar>فهرس العقارات</span>
+        </h5>
+        <p class="text-muted">
+          <span data-lang-fr>Filtrez par ville, type, surface et budget en DH.
+          Scraping temps réel depuis Mubawab, Avito et Sarouty.
+          Détectez les opportunités sous-évaluées.</span>
+          <span data-lang-ar>فلتر حسب المدينة والنوع والمساحة والميزانية بالدرهم.
+          استخراج مباشر من Mubawab وAvito وSarouty.
+          اكتشف العقارات المقدَّرة بأقل من قيمتها.</span>
+        </p>
+        <a href="{% url 'properties:list' %}" class="btn btn-sm btn-warning text-dark">
+          <span data-lang-fr>Explorer →</span>
+          <span data-lang-ar>استكشف ←</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboards -->
+  <div class="col-md-4">
+    <div class="card feature-card h-100">
+      <div class="card-body p-4">
+        <div class="feature-icon mb-3">
+          <i class="bi bi-bar-chart-fill text-success"></i>
+        </div>
+        <h5 class="fw-bold">
+          <span data-lang-fr>Dashboards Power BI</span>
+          <span data-lang-ar>لوحات Power BI</span>
+        </h5>
+        <p class="text-muted">
+          <span data-lang-fr>Visualisez le marché marocain : prix par m²,
+          tendances par ville, cartographie des quartiers
+          et analyse des segments.</span>
+          <span data-lang-ar>تصوّر السوق المغربي: السعر/م²، الاتجاهات
+          حسب المدينة، خرائط الأحياء وتحليل الشرائح.</span>
+        </p>
+        {% if user.is_authenticated %}
+          <a href="{% url 'dashboards:index' %}" class="btn btn-sm btn-success">
+            <span data-lang-fr>Voir les dashboards →</span>
+            <span data-lang-ar>عرض اللوحات ←</span>
+          </a>
+        {% else %}
+          <a href="{% url 'accounts:login' %}" class="btn btn-sm btn-outline-success">
+            <span data-lang-fr>Connexion requise →</span>
+            <span data-lang-ar>يتطلب تسجيل الدخول ←</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOP VILLES ────────────────────────────────────────────────────────────── -->
+<div class="card mb-5">
+  <div class="card-header">
+    <h5 class="mb-0">
+      <i class="bi bi-geo-alt-fill text-primary me-2"></i>
+      <span data-lang-fr>Top Villes du Maroc</span>
+      <span data-lang-ar>أبرز مدن المغرب</span>
+    </h5>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for ville_data in top_villes %}
+      <div class="col-6 col-md-4 col-lg-2">
+        <a href="{% url 'properties:list' %}?city={{ ville_data.ville }}"
+           class="text-decoration-none">
+          <div class="ville-chip text-center p-3 rounded-3">
+            <div class="fw-bold text-white">{{ ville_data.ville }}</div>
+            <small class="text-muted">
+              {{ ville_data.annonces }}
+              <span data-lang-fr>annonces</span>
+              <span data-lang-ar>إعلان</span>
+            </small>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── CTA INSCRIPTION ──────────────────────────────────────────────────────── -->
+{% if not user.is_authenticated %}
+<div class="card cta-card text-center p-5 mb-4">
+  <h3 class="fw-bold mb-3">
+    <span data-lang-fr>Prêt à estimer votre bien ?</span>
+    <span data-lang-ar>هل أنت مستعد لتقدير عقارك؟</span>
+  </h3>
+  <p class="text-muted mb-4">
+    <span data-lang-fr>Créez votre compte gratuitement et accédez à toutes les fonctionnalités.</span>
+    <span data-lang-ar>أنشئ حسابك مجاناً واستفد من جميع المميزات.</span>
+  </p>
+  <div class="d-flex justify-content-center gap-3 flex-wrap">
+    <a href="{% url 'accounts:register' %}" class="btn btn-primary btn-lg px-5">
+      <i class="bi bi-person-plus me-2"></i>
+      <span data-lang-fr>Créer un Compte</span>
+      <span data-lang-ar>إنشاء حساب</span>
+    </a>
+    <a href="{% url 'accounts:login' %}" class="btn btn-outline-light btn-lg">
+      <i class="bi bi-box-arrow-in-right me-2"></i>
+      <span data-lang-fr>Se Connecter</span>
+      <span data-lang-ar>تسجيل الدخول</span>
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

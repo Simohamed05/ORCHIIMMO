@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+{% block title %}Estimation de Prix — Orchiimmo{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Formulaire -->
+  <div class="col-lg-7">
+    <h2 class="fw-bold mb-1">
+      <i class="bi bi-calculator-fill text-primary me-2"></i>
+      <span data-lang-fr>Estimer un Bien</span>
+      <span data-lang-ar>تقدير سعر العقار</span>
+    </h2>
+    <p class="text-muted mb-4">
+      <span data-lang-fr>Appartements au Maroc — Prix en <strong class="text-warning">MAD (Dirham)</strong></span>
+      <span data-lang-ar>شقق بالمغرب — السعر بالدرهم <strong class="text-warning">MAD</strong></span>
+    </p>
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" id="predict-form" novalidate>
+          {% csrf_token %}
+
+          <div class="row g-3">
+            <!-- Ville -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-geo-alt me-1"></i>
+                <span data-lang-fr>Ville *</span>
+                <span data-lang-ar>المدينة *</span>
+              </label>
+              {{ form.city }}
+              {% if form.city.errors %}
+                <div class="text-danger small mt-1">{{ form.city.errors.0 }}</div>
+              {% endif %}
+            </div>
+
+            <!-- Quartier -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-map me-1"></i>
+                <span data-lang-fr>Quartier</span>
+                <span data-lang-ar>الحي</span>
+              </label>
+              {{ form.district }}
+            </div>
+
+            <!-- Type -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-house me-1"></i>
+                <span data-lang-fr>Type de bien *</span>
+                <span data-lang-ar>نوع العقار *</span>
+              </label>
+              {{ form.property_type }}
+            </div>
+
+            <!-- Surface -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-rulers me-1"></i>
+                <span data-lang-fr>Surface (m²) *</span>
+                <span data-lang-ar>المساحة (م²) *</span>
+              </label>
+              {{ form.area_m2 }}
+              {% if form.area_m2.errors %}
+                <div class="text-danger small mt-1">{{ form.area_m2.errors.0 }}</div>
+              {% endif %}
+            </div>
+
+            <!-- Chambres -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-door-closed me-1"></i>
+                <span data-lang-fr>Chambres</span>
+                <span data-lang-ar>الغرف</span>
+              </label>
+              {{ form.bedrooms }}
+            </div>
+
+            <!-- SDB -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-droplet me-1"></i>
+                <span data-lang-fr>Salles de bain</span>
+                <span data-lang-ar>الحمامات</span>
+              </label>
+              {{ form.bathrooms }}
+            </div>
+          </div>
+
+          <!-- Bouton -->
+          <button type="submit" class="btn btn-primary btn-lg w-100 mt-4" id="submit-btn">
+            <i class="bi bi-lightning-fill me-2"></i>
+            <span data-lang-fr>Calculer l'Estimation</span>
+            <span data-lang-ar>احسب التقدير</span>
+          </button>
+
+          {% if rate_limit_remaining is not None %}
+            <p class="text-muted small text-center mt-2">
+              <i class="bi bi-info-circle me-1"></i>
+              <span data-lang-fr>{{ rate_limit_remaining }} estimation(s) restante(s) cette heure</span>
+              <span data-lang-ar>{{ rate_limit_remaining }} تقدير(ات) متبقية هذه الساعة</span>
+            </p>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Colonne info -->
+  <div class="col-lg-5">
+    <!-- Comment ça marche -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>
+        <span data-lang-fr>Comment ça marche ?</span>
+        <span data-lang-ar>كيف يعمل؟</span>
+      </h6>
+      </div>
+      <div class="card-body">
+        <ol class="mb-0 ps-3">
+          <li class="mb-2">
+            <span data-lang-fr>Sélectionnez la ville et le type de bien</span>
+            <span data-lang-ar>اختر المدينة ونوع العقار</span>
+          </li>
+          <li class="mb-2">
+            <span data-lang-fr>Renseignez la surface et les caractéristiques</span>
+            <span data-lang-ar>أدخل المساحة والمميزات</span>
+          </li>
+          <li class="mb-2">
+            <span data-lang-fr>Notre IA calcule le prix en <strong>MAD</strong></span>
+            <span data-lang-ar>يحسب الذكاء الاصطناعي السعر بالدرهم <strong>MAD</strong></span>
+          </li>
+          <li>
+            <span data-lang-fr>Obtenez l'intervalle de confiance à 90%</span>
+            <span data-lang-ar>احصل على نطاق الثقة 90%</span>
+          </li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Stats modèle -->
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-cpu me-2"></i>
+          <span data-lang-fr>Modèle ML</span>
+          <span data-lang-ar>نموذج ML</span>
+        </h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 text-center">
+          <div class="col-6">
+            <div class="fw-bold text-primary fs-5">6 454</div>
+            <small class="text-muted">
+              <span data-lang-fr>Appartements d'entraînement</span>
+              <span data-lang-ar>شقق التدريب</span>
+            </small>
+          </div>
+          <div class="col-6">
+            <div class="fw-bold text-success fs-5">≥ 0.75</div>
+            <small class="text-muted">
+              <span data-lang-fr>R² cible</span>
+              <span data-lang-ar>هدف R²</span>
+            </small>
+          </div>
+          <div class="col-6">
+            <div class="fw-bold text-warning fs-5">90%</div>
+            <small class="text-muted">
+              <span data-lang-fr>Intervalle de confiance</span>
+              <span data-lang-ar>نطاق الثقة</span>
+            </small>
+          </div>
+          <div class="col-6">
+            <div class="fw-bold text-danger fs-5">MAD</div>
+            <small class="text-muted">
+              <span data-lang-fr>Devise (Dirham)</span>
+              <span data-lang-ar>العملة (درهم)</span>
+            </small>
+          </div>
+        </div>
+        <hr class="my-3">
+        <p class="text-muted small mb-0">
+          <i class="bi bi-shield-check text-success me-1"></i>
+          <span data-lang-fr>Modèle entraîné exclusivement sur des annonces marocaines réelles
+          (Mubawab, Sarouty, Avito).</span>
+          <span data-lang-ar>نموذج مدرَّب حصرياً على إعلانات عقارية مغربية حقيقية
+          (Mubawab، Sarouty، Avito).</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Historique rapide -->
+    {% if recent_predictions %}
+    <div class="card mt-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>
+          <span data-lang-fr>Récentes</span>
+          <span data-lang-ar>حديثة</span>
+        </h6>
+        <a href="{% url 'predictions:history' %}" class="btn btn-sm btn-outline-primary">
+          <span data-lang-fr>Tout voir</span>
+          <span data-lang-ar>عرض الكل</span>
+        </a>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for p in recent_predictions %}
+        <a href="{% url 'predictions:result' p.pk %}"
+           class="list-group-item list-group-item-action">
+          <div class="d-flex justify-content-between">
+            <small class="fw-semibold">{{ p.city }} — {{ p.area_m2|floatformat:0 }}m²</small>
+            <small class="text-primary">{{ p.predicted_price_mad|floatformat:0 }} DH</small>
+          </div>
+          <small class="text-muted">{{ p.created_at|date:"d/m H:i" }}</small>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Spinner pendant la soumission
+document.getElementById('predict-form').addEventListener('submit', function() {
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  const isAr = document.body.classList.contains('lang-ar');
+  btn.innerHTML = isAr
+    ? '<span class="spinner-border spinner-border-sm me-2"></span>جارٍ الحساب…'
+    : '<span class="spinner-border spinner-border-sm me-2"></span>Calcul en cours…';
+});
+</script>
+{% endblock %}

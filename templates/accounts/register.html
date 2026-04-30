@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% block title %}Inscription — Orchiimmo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+
+    <div class="text-center mb-4">
+      <i class="bi bi-person-plus-fill text-primary" style="font-size:3rem;"></i>
+      <h2 class="fw-bold mt-2">
+        <span data-lang-fr>Créer un Compte</span>
+        <span data-lang-ar>إنشاء حساب</span>
+      </h2>
+      <p class="text-muted">
+        <span data-lang-fr>Gratuit — Accès immédiat à l'estimation ML</span>
+        <span data-lang-ar>مجاني — وصول فوري لتقدير الذكاء الاصطناعي</span>
+      </p>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">
+                <i class="bi bi-person me-1"></i>
+                <span data-lang-fr>Prénom *</span>
+                <span data-lang-ar>الاسم الأول *</span>
+              </label>
+              <input type="text" name="first_name" class="form-control"
+                     value="{{ form.first_name.value|default:'' }}"
+                     placeholder="Prénom" required>
+              {% if form.first_name.errors %}
+                <div class="text-danger small mt-1">{{ form.first_name.errors.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">
+                <span data-lang-fr>Nom *</span>
+                <span data-lang-ar>اللقب *</span>
+              </label>
+              <input type="text" name="last_name" class="form-control"
+                     value="{{ form.last_name.value|default:'' }}"
+                     placeholder="Nom" required>
+              {% if form.last_name.errors %}
+                <div class="text-danger small mt-1">{{ form.last_name.errors.0 }}</div>
+              {% endif %}
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">
+                <i class="bi bi-at me-1"></i>
+                <span data-lang-fr>Nom d'utilisateur *</span>
+                <span data-lang-ar>اسم المستخدم *</span>
+              </label>
+              <input type="text" name="username" class="form-control"
+                     value="{{ form.username.value|default:'' }}"
+                     placeholder="ex: ahmed_maroc" required>
+              {% if form.username.errors %}
+                <div class="text-danger small mt-1">{{ form.username.errors.0 }}</div>
+              {% endif %}
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">
+                <i class="bi bi-envelope me-1"></i>
+                <span data-lang-fr>Email *</span>
+                <span data-lang-ar>البريد الإلكتروني *</span>
+              </label>
+              <input type="email" name="email" class="form-control"
+                     value="{{ form.email.value|default:'' }}"
+                     placeholder="vous@example.com" required>
+              {% if form.email.errors %}
+                <div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>
+              {% endif %}
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                <i class="bi bi-lock me-1"></i>
+                <span data-lang-fr>Mot de passe *</span>
+                <span data-lang-ar>كلمة المرور *</span>
+              </label>
+              <input type="password" name="password1" class="form-control"
+                     placeholder="8 caractères min." required>
+              {% if form.password1.errors %}
+                <div class="text-danger small mt-1">{{ form.password1.errors.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">
+                <i class="bi bi-lock-fill me-1"></i>
+                <span data-lang-fr>Confirmer *</span>
+                <span data-lang-ar>تأكيد كلمة المرور *</span>
+              </label>
+              <input type="password" name="password2" class="form-control"
+                     placeholder="Répéter le mot de passe" required>
+              {% if form.password2.errors %}
+                <div class="text-danger small mt-1">{{ form.password2.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger mt-3 py-2">
+              {% for error in form.non_field_errors %}
+                <div><i class="bi bi-exclamation-triangle me-1"></i>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <button type="submit" class="btn btn-primary btn-lg w-100 mt-4">
+            <i class="bi bi-check-circle me-2"></i>
+            <span data-lang-fr>Créer mon Compte</span>
+            <span data-lang-ar>إنشاء حسابي</span>
+          </button>
+        </form>
+
+        <hr class="my-4">
+        <p class="text-center text-muted mb-0">
+          <span data-lang-fr>Déjà inscrit ?</span>
+          <span data-lang-ar>هل لديك حساب؟</span>
+          <a href="{% url 'accounts:login' %}" class="text-primary fw-bold">
+            <span data-lang-fr>Se connecter</span>
+            <span data-lang-ar>تسجيل الدخول</span>
+          </a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Bénéfices -->
+    <div class="card mt-3">
+      <div class="card-body">
+        <h6 class="fw-bold mb-3">
+          <i class="bi bi-star-fill text-warning me-2"></i>
+          <span data-lang-fr>Avec votre compte</span>
+          <span data-lang-ar>مع حسابك</span>
+        </h6>
+        <ul class="list-unstyled mb-0">
+          <li class="mb-1">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            <span data-lang-fr>Estimation ML illimitée</span>
+            <span data-lang-ar>تقدير ذكاء اصطناعي غير محدود</span>
+          </li>
+          <li class="mb-1">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            <span data-lang-fr>Historique de vos estimations</span>
+            <span data-lang-ar>سجل تقديراتك</span>
+          </li>
+          <li class="mb-1">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            <span data-lang-fr>Accès aux dashboards Power BI</span>
+            <span data-lang-ar>الوصول إلى لوحات Power BI</span>
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            <span data-lang-fr>Biens comparables par ville</span>
+            <span data-lang-ar>عقارات مماثلة حسب المدينة</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

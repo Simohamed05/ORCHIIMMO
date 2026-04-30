@@ -1,0 +1,127 @@
+<nav class="navbar navbar-expand-lg navbar-dark">
+  <div class="container">
+    <!-- Logo / Brand -->
+    <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'home' %}">
+      <i class="bi bi-building-fill text-primary fs-4"></i>
+      <span class="fw-bold">ORCHI<span class="text-primary">IMMO</span></span>
+      <span class="badge badge-mad ms-1">🇲🇦 MAD</span>
+    </a>
+
+    <!-- Burger mobile -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navMain" aria-controls="navMain"
+            aria-expanded="false" aria-label="Menu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navMain">
+      <!-- Liens principaux -->
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+             href="{% url 'home' %}">
+            <i class="bi bi-house me-1"></i>
+            <span data-lang-fr>Accueil</span>
+            <span data-lang-ar>الرئيسية</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if 'properties' in request.resolver_match.app_name %}active{% endif %}"
+             href="{% url 'properties:list' %}">
+            <i class="bi bi-search me-1"></i>
+            <span data-lang-fr>Catalogue</span>
+            <span data-lang-ar>الفهرس</span>
+          </a>
+        </li>
+        {% if user.is_authenticated %}
+        <li class="nav-item">
+          <a class="nav-link {% if 'predictions' in request.resolver_match.app_name %}active{% endif %}"
+             href="{% url 'predictions:form' %}">
+            <i class="bi bi-calculator me-1"></i>
+            <span data-lang-fr>Estimation</span>
+            <span data-lang-ar>تقدير السعر</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if 'dashboards' in request.resolver_match.app_name %}active{% endif %}"
+             href="{% url 'dashboards:index' %}">
+            <i class="bi bi-bar-chart-fill me-1"></i>
+            <span data-lang-fr>Dashboards</span>
+            <span data-lang-ar>لوحات البيانات</span>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+
+      <!-- Droite : auth -->
+      <ul class="navbar-nav">
+        {% if user.is_authenticated %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'predictions:history' %}">
+              <i class="bi bi-clock-history me-1"></i>
+              <span data-lang-fr>Historique</span>
+              <span data-lang-ar>السجل</span>
+            </a>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button"
+               data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle me-1"></i>{{ user.username }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+              <li>
+                <a class="dropdown-item" href="{% url 'accounts:profile' %}">
+                  <i class="bi bi-person me-2"></i>
+                  <span data-lang-fr>Mon Profil</span>
+                  <span data-lang-ar>ملفي الشخصي</span>
+                </a>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="dropdown-item text-danger" href="{% url 'accounts:logout' %}">
+                  <i class="bi bi-box-arrow-right me-2"></i>
+                  <span data-lang-fr>Déconnexion</span>
+                  <span data-lang-ar>تسجيل الخروج</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+        {% else %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:login' %}">
+              <i class="bi bi-box-arrow-in-right me-1"></i>
+              <span data-lang-fr>Connexion</span>
+              <span data-lang-ar>تسجيل الدخول</span>
+            </a>
+          </li>
+          <li class="nav-item ms-2">
+            <a class="nav-link btn btn-primary text-white px-3 py-1"
+               href="{% url 'accounts:register' %}">
+              <i class="bi bi-person-plus me-1"></i>
+              <span data-lang-fr>Inscription</span>
+              <span data-lang-ar>إنشاء حساب</span>
+            </a>
+          </li>
+        {% endif %}
+
+        <!-- ── Toggles Thème + Langue ─── -->
+        <li class="nav-item d-flex align-items-center gap-1 ms-2">
+
+          <!-- Toggle Thème Clair/Sombre -->
+          <button id="theme-toggle" class="navbar-toggle-btn"
+                  title="Mode clair / sombre" aria-label="Basculer le thème">
+            <i class="bi bi-sun-fill" id="theme-icon-light"></i>
+            <i class="bi bi-moon-fill d-none" id="theme-icon-dark"></i>
+          </button>
+
+          <!-- Toggle Langue FR / AR -->
+          <button id="lang-toggle" class="navbar-toggle-btn"
+                  title="Français / العربية" aria-label="Changer de langue">
+            <span id="lang-label">AR</span>
+          </button>
+
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
