@@ -82,8 +82,8 @@ if _brevo_api_key:
     # ── Brevo REST API (HTTPS — contourne le blocage SMTP de Render) ─────────
     EMAIL_BACKEND      = 'config.brevo_backend.BrevoAPIBackend'
     BREVO_API_KEY      = _brevo_api_key
-    DEFAULT_FROM_EMAIL = 'Orchiimmo <Simohamedhadi05@gmail.com>'
+    DEFAULT_FROM_EMAIL = 'ORCHIIMMO <simohamedhadi05@gmail.com>'
 else:
     # ── Fallback console (visible dans les logs Render) ───────────────────────
     EMAIL_BACKEND      = 'django.core.mail.backends.console.EmailBackend'
-    DEFAULT_FROM_EMAIL = 'Orchiimmo <Simohamedhadi05@gmail.com>'
+    DEFAULT_FROM_EMAIL = 'ORCHIIMMO <simohamedhadi05@gmail.com>'
