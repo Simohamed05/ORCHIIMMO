@@ -1,4 +1,5 @@
 import logging
+import threading
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
@@ -12,6 +13,28 @@ from django.conf import settings
 from .forms import RegisterForm, ProfileForm
 
 logger = logging.getLogger(__name__)
+
+
+def _send_email_async(subject, message, from_email, recipient, html_message, log_tag='Email'):
+    """
+    Envoie un email dans un thread daemon pour ne pas bloquer la vue HTTP.
+    SMTP peut prendre 30-120s sur Render — cette fonction évite le timeout gunicorn.
+    """
+    def _send():
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=from_email,
+                recipient_list=[recipient],
+                html_message=html_message,
+                fail_silently=False,
+            )
+            logger.info(f'[{log_tag}] Email envoye a {recipient}')
+        except Exception as e:
+            logger.error(f'[{log_tag}] ERREUR SMTP ({type(e).__name__}) pour {recipient}: {e}')
+    t = threading.Thread(target=_send, daemon=True)
+    t.start()
 
 
 def register_view(request):
@@ -31,23 +54,24 @@ def register_view(request):
                 reverse('accounts:verify_email', args=[token])
             )
 
-            # Envoyer l'email de vérification
+            # Envoyer l'email en arrière-plan (évite de bloquer la réponse HTTP)
             try:
                 html_body = render_to_string('accounts/emails/verification_email.html', {
                     'user': user,
                     'verify_url': verify_url,
                 })
-                send_mail(
-                    subject='✅ Vérifiez votre compte Orchiimmo',
-                    message=f'Bonjour {user.first_name},\n\nCliquez ici pour vérifier votre compte :\n{verify_url}\n\nCe lien expire dans 24 heures.',
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    html_message=html_body,
-                    fail_silently=False,  # On gère l'erreur nous-mêmes pour logger
-                )
-                logger.info(f'[Email] Verification envoyee a {user.email}')
             except Exception as e:
-                logger.error(f'[Email] ERREUR SMTP ({type(e).__name__}) pour {user.email}: {e}')
+                logger.error(f'[Email] Erreur rendu template: {e}')
+                html_body = None
+
+            _send_email_async(
+                subject='✅ Vérifiez votre compte Orchiimmo',
+                message=f'Bonjour {user.first_name},\n\nCliquez ici pour vérifier votre compte :\n{verify_url}\n\nCe lien expire dans 24 heures.',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient=user.email,
+                html_message=html_body,
+                log_tag='Verification',
+            )
 
             return redirect('accounts:verification_sent')
     else:
@@ -89,17 +113,18 @@ def resend_verification_view(request):
                 html_body = render_to_string('accounts/emails/verification_email.html', {
                     'user': user, 'verify_url': verify_url,
                 })
-                send_mail(
-                    subject='✅ Vérifiez votre compte Orchiimmo',
-                    message=f'Lien de vérification : {verify_url}',
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    html_message=html_body,
-                    fail_silently=False,
-                )
-                logger.info(f'[Email] Renvoi verification a {user.email}')
             except Exception as e:
-                logger.error(f'[Email] ERREUR SMTP renvoi ({type(e).__name__}) pour {user.email}: {e}')
+                logger.error(f'[Email] Erreur rendu template renvoi: {e}')
+                html_body = None
+
+            _send_email_async(
+                subject='✅ Vérifiez votre compte Orchiimmo',
+                message=f'Lien de vérification : {verify_url}',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient=user.email,
+                html_message=html_body,
+                log_tag='Renvoi',
+            )
             messages.success(request, f'Email renvoyé à {user.email}')
         except User.DoesNotExist:
             messages.error(request, 'Compte introuvable ou déjà activé.')
