@@ -71,6 +71,18 @@ LOGGING = {
     },
 }
 
+# ─── Fix IPv6 Render : forcer IPv4 pour le SMTP ──────────────────────────────
+# Render free tier n'a pas de routage IPv6 → smtp.gmail.com résout en IPv6 en premier
+# → OSError: [Errno 101] Network is unreachable
+# Solution : monkey-patch socket.getaddrinfo pour forcer AF_INET (IPv4)
+import socket as _socket
+if not getattr(_socket, '_orchi_ipv4_patch', False):
+    _orig_gai = _socket.getaddrinfo
+    def _ipv4_only_gai(host, port, family=0, type=0, proto=0, flags=0):
+        return _orig_gai(host, port, _socket.AF_INET, type, proto, flags)
+    _socket.getaddrinfo = _ipv4_only_gai
+    _socket._orchi_ipv4_patch = True
+
 # ─── Email production ────────────────────────────────────────────────────────
 # Si EMAIL_HOST_USER est défini → SMTP SSL port 465, sinon → console (logs Render)
 # Note: port 465 (SSL) est plus fiable que 587 (STARTTLS) sur Render (IPv6 absent)

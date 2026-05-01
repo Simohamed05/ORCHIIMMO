@@ -43,11 +43,11 @@ def register_view(request):
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[user.email],
                     html_message=html_body,
-                    fail_silently=True,
+                    fail_silently=False,  # On gère l'erreur nous-mêmes pour logger
                 )
-                logger.info(f'[Email] Vérification envoyée à {user.email}')
+                logger.info(f'[Email] Verification envoyee a {user.email}')
             except Exception as e:
-                logger.warning(f'[Email] Échec envoi à {user.email}: {e}')
+                logger.error(f'[Email] ERREUR SMTP ({type(e).__name__}) pour {user.email}: {e}')
 
             return redirect('accounts:verification_sent')
     else:
@@ -95,10 +95,11 @@ def resend_verification_view(request):
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[user.email],
                     html_message=html_body,
-                    fail_silently=True,
+                    fail_silently=False,
                 )
+                logger.info(f'[Email] Renvoi verification a {user.email}')
             except Exception as e:
-                logger.warning(f'[Email] Renvoi échoué : {e}')
+                logger.error(f'[Email] ERREUR SMTP renvoi ({type(e).__name__}) pour {user.email}: {e}')
             messages.success(request, f'Email renvoyé à {user.email}')
         except User.DoesNotExist:
             messages.error(request, 'Compte introuvable ou déjà activé.')
