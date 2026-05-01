@@ -90,8 +90,8 @@
         </thead>
         <tbody>
           {% for model_name, m in metrics.items %}
-          <tr {% if model_name == best_model %}class="table-success"{% endif %}>
-            <td class="fw-bold">
+          <tr {% if model_name == best_model %}style="background:rgba(6,214,160,0.12);border-left:3px solid #06D6A0;"{% endif %}>
+            <td class="fw-bold" {% if model_name == best_model %}style="color:#06D6A0;"{% endif %}>
               <i class="bi bi-cpu me-2"></i>{{ model_name }}
             </td>
             <td class="text-center">
@@ -104,7 +104,7 @@
             <td class="text-center">{{ m.MAPE|floatformat:1 }}%</td>
             <td class="text-center">
               {% if model_name == best_model %}
-                <span class="badge bg-success"><i class="bi bi-trophy me-1"></i>Meilleur</span>
+                <span class="badge" style="background:#06D6A0;color:#0f1117;"><i class="bi bi-trophy me-1"></i>Meilleur</span>
               {% else %}
                 <span class="badge bg-secondary">—</span>
               {% endif %}
