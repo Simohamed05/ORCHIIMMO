@@ -185,18 +185,21 @@ class OrchiimmoMLEngine:
         log_pred  = self.model.predict(feat)[0]
         price_mad = float(np.expm1(log_pred))
 
-        # ── Intervalle de confiance ────────────────────────────────────────────
-        try:
-            # RandomForest : std sur les arbres individuels → CI 90% (z=1.645)
-            est    = self.model.estimators_
-            preds  = np.array([np.expm1(t.predict(feat)[0]) for t in est])
-            std    = preds.std()
-            low    = max(0.0, price_mad - 1.645 * std)
-            high   = price_mad + 1.645 * std
-        except AttributeError:
-            # LightGBM / XGBoost : fallback ±20%
-            low  = price_mad * 0.80
-            high = price_mad * 1.20
+        # ── Intervalle de confiance (basé sur MAE du modèle) ─────────────────
+        # La variance des arbres RF individuels est trop élevée (bruit non réduit).
+        # On utilise le MAE de test — si price_pred ± 1.645×MAE contient 90%
+        # des vraies valeurs sous hypothèse d'erreurs normales.
+        mae = self.metadata.get('MAE', None)
+        if mae and mae > 0:
+            # MAE du training (en MAD) → CI 90% symétrique autour du prix
+            margin = 1.645 * float(mae)
+        else:
+            # Fallback : ±18% (réaliste pour l'immobilier marocain)
+            margin = price_mad * 0.18
+
+        # Borne basse : jamais en-dessous de 60% du prix prédit
+        low  = max(price_mad * 0.60, price_mad - margin)
+        high = price_mad + margin
 
         comparables = self._find_comparables(city_low, type_low, area_m2)
 
