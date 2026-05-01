@@ -71,50 +71,19 @@ LOGGING = {
     },
 }
 
-# ─── Fix IPv6 Render : forcer IPv4 pour le SMTP ──────────────────────────────
-# Render free tier n'a pas de routage IPv6 → smtp.gmail.com résout en IPv6 en premier
-# → OSError: [Errno 101] Network is unreachable
-# Solution : monkey-patch socket.getaddrinfo pour forcer AF_INET (IPv4)
-import socket as _socket
-if not getattr(_socket, '_orchi_ipv4_patch', False):
-    _orig_gai = _socket.getaddrinfo
-    def _ipv4_only_gai(host, port, family=0, type=0, proto=0, flags=0):
-        return _orig_gai(host, port, _socket.AF_INET, type, proto, flags)
-    _socket.getaddrinfo = _ipv4_only_gai
-    _socket._orchi_ipv4_patch = True
-
 # ─── Email production ────────────────────────────────────────────────────────
-# Gmail SMTP est bloqué depuis les IPs cloud AWS/Render → utiliser Brevo SMTP
-# Brevo (ex-Sendinblue) : smtp-relay.brevo.com:587 — fonctionne depuis Render
-# Variables : BREVO_SMTP_USER (email Brevo) + BREVO_SMTP_KEY (clé API SMTP)
-# Fallback : Gmail si BREVO non configuré
-# Fallback final : console (logs)
-_brevo_user = config('BREVO_SMTP_USER', default='')
-_brevo_key  = config('BREVO_SMTP_KEY', default='')
-_email_user = config('EMAIL_HOST_USER', default='')
+# Render free tier bloque les connexions SMTP sortantes (ports 465 et 587).
+# Solution : utiliser l'API REST Brevo (HTTPS port 443 — jamais bloqué).
+# Variable requise : BREVO_API_KEY (clé API Brevo, commence par xkeysib-)
+# Fallback console si clé non configurée.
+_brevo_api_key = config('BREVO_API_KEY', default='')
 
-if _brevo_user and _brevo_key:
-    # ── Brevo SMTP port 465 SSL (plus fiable sur Render que 587 STARTTLS) ────
-    EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST          = 'smtp-relay.brevo.com'
-    EMAIL_PORT          = 465
-    EMAIL_USE_TLS       = False
-    EMAIL_USE_SSL       = True
-    EMAIL_HOST_USER     = _brevo_user
-    EMAIL_HOST_PASSWORD = _brevo_key
-    DEFAULT_FROM_EMAIL  = f'Orchiimmo <{_brevo_user}>'
-    EMAIL_TIMEOUT       = 60   # 60s : Render peut être lent à établir SMTP
-elif _email_user:
-    # ── Gmail SMTP (fallback — peut être bloqué sur Render) ───────────────────
-    EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST          = 'smtp.gmail.com'
-    EMAIL_PORT          = 465
-    EMAIL_USE_TLS       = False
-    EMAIL_USE_SSL       = True
-    EMAIL_HOST_USER     = _email_user
-    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-    DEFAULT_FROM_EMAIL  = f'Orchiimmo <{_email_user}>'
-    EMAIL_TIMEOUT       = 60
+if _brevo_api_key:
+    # ── Brevo REST API (HTTPS — contourne le blocage SMTP de Render) ─────────
+    EMAIL_BACKEND      = 'config.brevo_backend.BrevoAPIBackend'
+    BREVO_API_KEY      = _brevo_api_key
+    DEFAULT_FROM_EMAIL = 'Orchiimmo <contact@orchiimmo.ma>'
 else:
+    # ── Fallback console (visible dans les logs Render) ───────────────────────
     EMAIL_BACKEND      = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'Orchiimmo <noreply@orchiimmo.ma>'
