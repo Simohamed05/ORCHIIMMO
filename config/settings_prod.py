@@ -72,16 +72,19 @@ LOGGING = {
 }
 
 # ─── Email production ────────────────────────────────────────────────────────
-# Si EMAIL_HOST_USER est défini → SMTP, sinon → console (logs Render)
+# Si EMAIL_HOST_USER est défini → SMTP SSL port 465, sinon → console (logs Render)
+# Note: port 465 (SSL) est plus fiable que 587 (STARTTLS) sur Render (IPv6 absent)
 _email_user = config('EMAIL_HOST_USER', default='')
 if _email_user:
     EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST          = config('EMAIL_HOST', default='smtp.gmail.com')
-    EMAIL_PORT          = config('EMAIL_PORT', default=587, cast=int)
-    EMAIL_USE_TLS       = True
+    EMAIL_HOST          = 'smtp.gmail.com'
+    EMAIL_PORT          = 465          # SSL direct — évite l'erreur IPv6 sur Render
+    EMAIL_USE_TLS       = False        # STARTTLS désactivé (on utilise SSL)
+    EMAIL_USE_SSL       = True         # SSL activé sur port 465
     EMAIL_HOST_USER     = _email_user
     EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
     DEFAULT_FROM_EMAIL  = f'Orchiimmo <{_email_user}>'
+    EMAIL_TIMEOUT       = 30           # Timeout 30s pour éviter hang
 else:
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    EMAIL_BACKEND      = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'Orchiimmo <noreply@orchiimmo.ma>'
