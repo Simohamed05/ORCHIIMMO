@@ -94,16 +94,16 @@ _brevo_key  = config('BREVO_SMTP_KEY', default='')
 _email_user = config('EMAIL_HOST_USER', default='')
 
 if _brevo_user and _brevo_key:
-    # ── Brevo SMTP (recommandé pour Render) ───────────────────────────────────
+    # ── Brevo SMTP port 465 SSL (plus fiable sur Render que 587 STARTTLS) ────
     EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST          = 'smtp-relay.brevo.com'
-    EMAIL_PORT          = 587
-    EMAIL_USE_TLS       = True
-    EMAIL_USE_SSL       = False
+    EMAIL_PORT          = 465
+    EMAIL_USE_TLS       = False
+    EMAIL_USE_SSL       = True
     EMAIL_HOST_USER     = _brevo_user
     EMAIL_HOST_PASSWORD = _brevo_key
     DEFAULT_FROM_EMAIL  = f'Orchiimmo <{_brevo_user}>'
-    EMAIL_TIMEOUT       = 20
+    EMAIL_TIMEOUT       = 60   # 60s : Render peut être lent à établir SMTP
 elif _email_user:
     # ── Gmail SMTP (fallback — peut être bloqué sur Render) ───────────────────
     EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
@@ -114,7 +114,7 @@ elif _email_user:
     EMAIL_HOST_USER     = _email_user
     EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
     DEFAULT_FROM_EMAIL  = f'Orchiimmo <{_email_user}>'
-    EMAIL_TIMEOUT       = 20
+    EMAIL_TIMEOUT       = 60
 else:
     EMAIL_BACKEND      = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'Orchiimmo <noreply@orchiimmo.ma>'

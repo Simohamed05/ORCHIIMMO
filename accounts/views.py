@@ -32,7 +32,11 @@ def _send_email_async(subject, message, from_email, recipient, html_message, log
             )
             logger.info(f'[{log_tag}] Email envoye a {recipient}')
         except Exception as e:
-            logger.error(f'[{log_tag}] ERREUR SMTP ({type(e).__name__}) pour {recipient}: {e}')
+            import traceback as _tb
+            logger.error(
+                f'[{log_tag}] ERREUR SMTP ({type(e).__name__}) pour {recipient}: {e}\n'
+                + _tb.format_exc()
+            )
     t = threading.Thread(target=_send, daemon=True)
     t.start()
 
