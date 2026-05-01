@@ -216,6 +216,27 @@
             </div>
           </div>
 
+          <!-- Surface m² -->
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">
+              <i class="bi bi-rulers me-1"></i>
+              <span data-lang-fr>Surface (m²)</span>
+              <span data-lang-ar>المساحة (م²)</span>
+            </label>
+            <div class="input-group input-group-sm mb-1">
+              <span class="input-group-text">Min</span>
+              <input type="number" name="area_min" class="form-control"
+                     value="{{ f_area_min }}" placeholder="0" min="0" step="10">
+              <span class="input-group-text">m²</span>
+            </div>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Max</span>
+              <input type="number" name="area_max" class="form-control"
+                     value="{{ f_area_max }}" placeholder="∞" min="0" step="10">
+              <span class="input-group-text">m²</span>
+            </div>
+          </div>
+
           <!-- Tri -->
           <div class="mb-3">
             <label class="form-label small fw-semibold">

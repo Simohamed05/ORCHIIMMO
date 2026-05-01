@@ -34,12 +34,14 @@ def property_list(request):
     qs = Property.objects.all()
 
     # ─── Filtres GET ──────────────────────────────────────────────────────────
-    city    = request.GET.get('city',      '').strip()
-    ptype   = request.GET.get('type',      '').strip()
-    p_min   = request.GET.get('price_min', '').strip()
-    p_max   = request.GET.get('price_max', '').strip()
-    opport  = request.GET.get('opportunity','').strip()
-    sort_by = request.GET.get('sort',      'price_mad')
+    city     = request.GET.get('city',      '').strip()
+    ptype    = request.GET.get('type',      '').strip()
+    p_min    = request.GET.get('price_min', '').strip()
+    p_max    = request.GET.get('price_max', '').strip()
+    a_min    = request.GET.get('area_min',  '').strip()
+    a_max    = request.GET.get('area_max',  '').strip()
+    opport   = request.GET.get('opportunity','').strip()
+    sort_by  = request.GET.get('sort',      'price_mad')
 
     if city:
         qs = qs.filter(city__iexact=city)
@@ -53,6 +55,16 @@ def property_list(request):
     if p_max:
         try:
             qs = qs.filter(price_mad__lte=float(p_max))
+        except ValueError:
+            pass
+    if a_min:
+        try:
+            qs = qs.filter(area_m2__gte=float(a_min))
+        except ValueError:
+            pass
+    if a_max:
+        try:
+            qs = qs.filter(area_m2__lte=float(a_max))
         except ValueError:
             pass
     if opport:
@@ -94,12 +106,14 @@ def property_list(request):
         'stats':     stats,
         'db_stats':  db_stats,
         # Filtres actifs
-        'f_city':    city,
-        'f_type':    ptype,
-        'f_pmin':    p_min,
-        'f_pmax':    p_max,
-        'f_opport':  opport,
-        'f_sort':    sort_by,
+        'f_city':     city,
+        'f_type':     ptype,
+        'f_pmin':     p_min,
+        'f_pmax':     p_max,
+        'f_area_min': a_min,
+        'f_area_max': a_max,
+        'f_opport':   opport,
+        'f_sort':     sort_by,
     })
 
 
