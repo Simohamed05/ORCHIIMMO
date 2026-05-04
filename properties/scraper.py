@@ -216,6 +216,130 @@ def _empty_contact() -> dict:
     }
 
 
+def _fetch_detail_contact(session, url: str) -> dict:
+    """
+    Visite la page de détail d'une annonce pour extraire les coordonnées.
+    Stratégie par ordre de priorité :
+      1. Liens WhatsApp wa.me?phone=  (Agenz, LogicImmo)
+      2. Liens tel: dans le HTML
+      3. JSON-LD seller/agent name  (Mubawab, Agenz)
+      4. Attributs data-* avec numéro
+      5. Regex numéro marocain dans le texte
+      6. Numéro partiel visible (MarocAnnonces)
+      7. Email visible
+    """
+    contact = _empty_contact()
+    if not url:
+        return contact
+    try:
+        r = session.get(url, timeout=20, allow_redirects=True)
+        if r.status_code != 200:
+            return contact
+        html = r.text
+        soup = BeautifulSoup(html, 'lxml')
+        full_text = soup.get_text(' ')
+
+        # ── 1. Liens WhatsApp (phone= dans l'URL) ────────────────────────────
+        wa_links = soup.find_all('a', href=re.compile(r'wa\.me|whatsapp\.com/send', re.I))
+        for wa in wa_links:
+            href = wa.get('href', '')
+            phone_m = re.search(r'(?:wa\.me/|phone=)(\+?\d{10,14})', href)
+            if not phone_m:
+                continue
+            raw = phone_m.group(1).strip()
+            # Normaliser vers format 0XXXXXXXXX (10 chiffres)
+            if raw.startswith('+212') and len(raw) >= 12:
+                phone = '0' + raw[4:]
+            elif raw.startswith('00212') and len(raw) >= 13:
+                phone = '0' + raw[5:]
+            elif raw.startswith('212') and len(raw) >= 11:
+                phone = '0' + raw[3:]
+            else:
+                phone = raw
+            # Vérification basique : 10 chiffres marocains
+            if re.match(r'^0[5-7]\d{8}$', phone):
+                if not contact['contact_phone']:
+                    contact['contact_phone'] = phone
+                elif phone != contact['contact_phone'] and not contact['contact_phone2']:
+                    contact['contact_phone2'] = phone
+
+        # ── 2. Liens tel: ────────────────────────────────────────────────────
+        for tel_tag in soup.find_all('a', href=re.compile(r'^tel:')):
+            raw = tel_tag.get('href', '').replace('tel:', '').strip()
+            phones = _extract_phones(raw)
+            if phones and not contact['contact_phone']:
+                contact['contact_phone'] = phones[0]
+
+        # ── 3. JSON-LD seller/agent ──────────────────────────────────────────
+        for scr in soup.find_all('script', type='application/ld+json'):
+            try:
+                d = json.loads(scr.get_text())
+                seller = (d.get('seller') or d.get('author')
+                          or d.get('offers', {}).get('seller') or {})
+                if isinstance(seller, dict) and seller.get('name'):
+                    name = str(seller['name'])[:200]
+                    if not contact['contact_agency']:
+                        contact['contact_agency'] = name
+                    if not contact['contact_name']:
+                        contact['contact_name'] = name
+                    if not contact['contact_type']:
+                        contact['contact_type'] = _detect_contact_type(name)
+                # Phone in schema
+                for field in ('telephone', 'phone', 'contactPoint'):
+                    v = d.get(field, '')
+                    if v and isinstance(v, str):
+                        phones = _extract_phones(v)
+                        if phones and not contact['contact_phone']:
+                            contact['contact_phone'] = phones[0]
+            except Exception:
+                pass
+
+        # ── 4. Attributs data-* avec numéro ─────────────────────────────────
+        if not contact['contact_phone']:
+            for el in soup.find_all(True):
+                for attr, val in el.attrs.items():
+                    if isinstance(val, str):
+                        phones = _extract_phones(val)
+                        if phones:
+                            contact['contact_phone'] = phones[0]
+                            break
+                if contact['contact_phone']:
+                    break
+
+        # ── 5. Regex numéro marocain dans le HTML (hors Site UI) ─────────────
+        if not contact['contact_phone']:
+            # Cherche dans les balises proches du mot "contact/vendeur/annonceur"
+            for el in soup.find_all(['div', 'section', 'aside', 'p', 'span']):
+                txt = el.get_text(' ')
+                if any(k in txt.lower() for k in ('annonceur', 'vendeur', 'agence', 'contact', 'propriétaire')):
+                    phones = _extract_phones(txt)
+                    if phones:
+                        contact['contact_phone'] = phones[0]
+                        if len(phones) > 1:
+                            contact['contact_phone2'] = phones[1]
+                        break
+
+        # ── 6. Numéro partiel affiché (ex: MarocAnnonces "067-1******") ──────
+        if not contact['contact_phone']:
+            for el in soup.find_all(id=re.compile(r'phone|tel', re.I)):
+                txt = el.get_text(strip=True)
+                partial_m = re.search(r'(0[5-7]\d{1,2}[-\s]?\d{1,2})\*+', txt)
+                if partial_m:
+                    contact['contact_phone'] = partial_m.group(1).replace('-', '').replace(' ', '') + '******'
+                    break
+
+        # ── 7. Email ─────────────────────────────────────────────────────────
+        if not contact['contact_email']:
+            email = _extract_email(full_text)
+            if email and 'noreply' not in email and 'support' not in email:
+                contact['contact_email'] = email
+
+    except Exception as e:
+        logger.debug(f'[Contact] Erreur detail ({url[:60]}): {e}')
+
+    return contact
+
+
 def _make_listing(source, city, dist, ptype, title, price_mad, area_m2,
                   bedrooms, bathrooms, url, contact=None) -> dict:
     area_m2 = area_m2 if area_m2 and area_m2 > 0 else None
@@ -267,6 +391,14 @@ class MubawabScraper:
                     if listing:
                         if city_filter and city_filter.lower() not in listing['city'].lower():
                             continue
+                        # ── Enrichissement contact (agence depuis JSON-LD) ────
+                        detail_url = listing.get('url', '')
+                        if detail_url and not listing.get('contact_agency'):
+                            detail_contact = _fetch_detail_contact(session, detail_url)
+                            for k, v in detail_contact.items():
+                                if v and not listing.get(k):
+                                    listing[k] = v
+                            _delay(0.3, 0.7)
                         yield listing
                 if page < max_pages:
                     _delay()
@@ -619,6 +751,18 @@ class AgenzScraper:
                 for listing in listings:
                     if city_filter and city_filter.lower() not in listing['city'].lower():
                         continue
+                    # ── Enrichissement contact via page de détail ─────────────
+                    detail_url = listing.get('url', '').rstrip('/')
+                    # Supprimer /video pour accéder à la vraie page
+                    if detail_url.endswith('/video'):
+                        detail_url = detail_url[:-6]
+                        listing['url'] = detail_url
+                    if detail_url and not listing.get('contact_phone'):
+                        detail_contact = _fetch_detail_contact(session, detail_url)
+                        for k, v in detail_contact.items():
+                            if v and not listing.get(k):
+                                listing[k] = v
+                        _delay(0.5, 1.0)
                     yield listing
 
             except Exception as e:
@@ -746,7 +890,6 @@ class AgenzScraper:
 
 class MarocAnnoncesScraper:
     SOURCE = 'marocannonces'
-    # URL correcte pour la catégorie vente immobilier
     BASE   = 'https://www.marocannonces.com/categorie/16/Vente-immobilier.html?p={page}'
 
     def scrape(self, max_pages=5, city_filter='') -> Iterator[dict]:
@@ -756,67 +899,148 @@ class MarocAnnoncesScraper:
             if not soup:
                 break
 
-            cards = soup.select('li.holder, .listing-item, .ann-item')
-            if not cards:
-                # Fallback : chercher des éléments avec prix
+            # Essayer d'abord les liens directs d'annonces immobilier
+            annonce_links = soup.find_all(
+                'a', href=re.compile(r'categorie/(?:3|16|17|18)\d*/[^/]+/annonce/\d+', re.I)
+            )
+            if annonce_links:
+                seen = set()
+                for a_tag in annonce_links:
+                    href = a_tag.get('href', '')
+                    if not href.startswith('http'):
+                        href = 'https://www.marocannonces.com/' + href.lstrip('/')
+                    if href in seen:
+                        continue
+                    seen.add(href)
+                    listing = self._scrape_detail(session, href)
+                    if listing:
+                        if city_filter and city_filter.lower() not in listing['city'].lower():
+                            continue
+                        yield listing
+                    _delay(0.3, 0.7)
+            else:
+                # Fallback : li contenant "DH"
                 cards = [li for li in soup.select('li')
                          if 'DH' in li.get_text() and li.select('a')]
-            if not cards:
-                break
-
-            for card in cards:
-                listing = self._parse_card(card)
-                if listing:
-                    if city_filter and city_filter.lower() not in listing['city'].lower():
-                        continue
-                    yield listing
+                if not cards:
+                    break
+                for card in cards:
+                    listing = self._parse_card(card)
+                    if listing:
+                        if city_filter and city_filter.lower() not in listing['city'].lower():
+                            continue
+                        # Enrichir le contact depuis la page de détail
+                        if listing.get('url') and 'marocannonces' in listing['url']:
+                            dc = _fetch_detail_contact(session, listing['url'])
+                            for k, v in dc.items():
+                                if v and not listing.get(k):
+                                    listing[k] = v
+                            _delay(0.3, 0.7)
+                        yield listing
 
             if page < max_pages:
                 _delay()
 
-    def _parse_card(self, card) -> Optional[dict]:
+    def _parse_card(self, card, city_hint='') -> Optional[dict]:
+        """Fallback si on n'arrive pas à extraire les liens individuels."""
         text = card.get_text(' ')
         if not any(k in text.lower() for k in ('dh', 'mad', 'appartement', 'villa',
                                                 'terrain', 'bureau', 'maison', 'immo')):
             return None
-
         price_el = card.select_one('.price, [class*="price"], b, strong, .prixann')
         price_mad = _parse_price_mad(price_el.get_text(strip=True)) if price_el else _parse_price_mad(text)
         if not price_mad:
             return None
-
         link  = card.select_one('a[href*="marocannonces"]') or card.select_one('a')
         href  = link.get('href', '') if link else ''
         if href and not href.startswith('http'):
             href = 'https://www.marocannonces.com' + href
         title = (link.get_text(strip=True) if link else '')[:300]
+        # Ville depuis le texte
+        city = city_hint or 'Maroc'
+        for v in VILLES_MAROC:
+            if v in text.lower():
+                city = v.title()
+                break
+        area_m2 = _parse_area(text)
+        return _make_listing(self.SOURCE, city, '', _guess_type(title + ' ' + text),
+                             title, price_mad, area_m2, None, None, href)
 
-        # Localisation
-        loc_el = card.select_one('.ville, .city, [class*="location"], [class*="ville"]')
-        location_raw = loc_el.get_text(strip=True) if loc_el else ''
-        if not location_raw:
-            # Try to find city from text
+    def _scrape_detail(self, session, url: str, city_hint: str = '') -> Optional[dict]:
+        """Scrape une page de détail d'annonce MarocAnnonces — inclut le contact."""
+        try:
+            soup = _get(session, url)
+            if not soup:
+                return None
+            full_text = soup.get_text(' ')
+
+            # Prix
+            price_el = soup.select_one('.prix-annonce, .price, [class*="prix"], h2, h1')
+            price_mad = _parse_price_mad(price_el.get_text(strip=True)) if price_el else None
+            if not price_mad:
+                price_mad = _parse_price_mad(full_text)
+            if not price_mad:
+                return None
+
+            # Titre
+            title_el = soup.select_one('h1, h2, .titre-annonce, [class*="title"]')
+            title = (title_el.get_text(strip=True) if title_el else '')[:300]
+
+            # Localisation
+            city = city_hint or 'Maroc'
+            dist = ''
             for ville in VILLES_MAROC:
-                if ville in text.lower():
-                    location_raw = ville
+                if ville in full_text.lower():
+                    city = ville.title()
                     break
-        city, dist = _split_location(location_raw) if location_raw else ('Maroc', '')
+            loc_el = soup.select_one('.ville, .city, [class*="location"], [class*="ville"], .localisation')
+            if loc_el:
+                loc_text = loc_el.get_text(strip=True)
+                city_d, dist = _split_location(loc_text)
+                if city_d and city_d != 'Maroc':
+                    city = city_d
 
-        area_m2  = _parse_area(text)
-        phones   = _extract_phones(text)
-        email    = _extract_email(text)
+            # Surface / caractéristiques
+            area_m2  = _parse_area(full_text)
+            bedrooms_m = re.search(r'(\d+)\s*(?:chambre|ch\.)', full_text, re.I)
+            bedrooms = int(bedrooms_m.group(1)) if bedrooms_m else None
 
-        contact = {
-            'contact_phone':  phones[0] if phones else '',
-            'contact_phone2': phones[1] if len(phones) > 1 else '',
-            'contact_email':  email,
-            'contact_name':   '',
-            'contact_agency': '',
-            'contact_type':   _detect_contact_type(text),
-        }
-        return _make_listing(self.SOURCE, city, dist,
-                             _guess_type(title + ' ' + text), title,
-                             price_mad, area_m2, None, None, href, contact)
+            # Contact — numéro partiel [id*=phone] + enrichissement complet
+            contact = _empty_contact()
+            phone_el = soup.find(id=re.compile(r'phone|tel', re.I))
+            if phone_el:
+                ptext = phone_el.get_text(strip=True)
+                # Numéro complet visible ?
+                phones = _extract_phones(ptext)
+                if phones:
+                    contact['contact_phone'] = phones[0]
+                else:
+                    # Partiel ex: "067-1******"
+                    partial_m = re.search(r'(0[5-7]\d{1,3})[-\s]?\d*\*+', ptext)
+                    if partial_m:
+                        contact['contact_phone'] = partial_m.group(1) + '******'
+
+            # Annonceur / agence
+            ann_el = soup.select_one('.annonceur, .info-annonceur, [class*=annonceur], [id*=annonceur]')
+            if ann_el:
+                ann_text = ann_el.get_text(' ', strip=True)
+                phones_ann = _extract_phones(ann_text)
+                if phones_ann and not contact['contact_phone']:
+                    contact['contact_phone'] = phones_ann[0]
+                    if len(phones_ann) > 1:
+                        contact['contact_phone2'] = phones_ann[1]
+                # Agency name
+                name_m = re.search(r'(?:Agence|Promoteur|Par)\s*:?\s*([^\n\r]+)', ann_text, re.I)
+                if name_m:
+                    contact['contact_agency'] = name_m.group(1).strip()[:200]
+                contact['contact_type'] = _detect_contact_type(ann_text)
+
+            return _make_listing(self.SOURCE, city, dist,
+                                 _guess_type(title + ' ' + full_text), title,
+                                 price_mad, area_m2, bedrooms, None, url, contact)
+        except Exception as e:
+            logger.debug(f'[MarocAnnonces] detail error ({url[:60]}): {e}')
+            return None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
