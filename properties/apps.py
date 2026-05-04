@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 
 SCRAPE_INTERVAL_HOURS = 6
 SCRAPE_PAGES          = 3
-SCRAPE_SOURCES        = ['mubawab', 'avito']
+SCRAPE_SOURCES        = [
+    'mubawab', 'avito', 'sarouty',
+    'sekna', 'selectimmo', 'logiqueimmo',
+    'marocannonce', 'maisonmaroc', 'keurimmo', 'immobilier',
+]
 INITIAL_DELAY_SECONDS = 45
 
 

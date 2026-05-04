@@ -2,9 +2,17 @@ from django.db import models
 
 class Property(models.Model):
     SOURCE_CHOICES = [
-        ('mubawab',   'Mubawab'), ('sarouty', 'Sarouty'),
-        ('avito',     'Avito'),   ('sekna',   'Sekna'),
-        ('mondinion', 'Mondinion'), ('autre', 'Autre'),
+        ('mubawab',      'Mubawab'),
+        ('avito',        'Avito'),
+        ('sarouty',      'Sarouty'),
+        ('sekna',        'Sekna'),
+        ('selectimmo',   'SelectImmo'),
+        ('logiqueimmo',  'LogiqueImmo'),
+        ('marocannonce', 'MarocAnnonce'),
+        ('maisonmaroc',  'MaisonMaroc'),
+        ('keurimmo',     'Keurimmo'),
+        ('immobilier',   'Immobilier.ma'),
+        ('autre',        'Autre'),
     ]
     TYPE_CHOICES = [
         ('apartment', 'Appartement'), ('villa', 'Villa / Maison'),
@@ -50,6 +58,27 @@ class Property(models.Model):
                                           verbose_name='Score opportunité')
     price_category    = models.CharField(max_length=30, blank=True,
                                          verbose_name='Catégorie prix')
+
+    # ── Contact du vendeur / agence ──────────────────────────────────────────
+    CONTACT_TYPE_CHOICES = [
+        ('',            'Inconnu'),
+        ('particulier', 'Particulier'),
+        ('agence',      'Agence'),
+        ('promoteur',   'Promoteur'),
+    ]
+    contact_name   = models.CharField(max_length=200, blank=True,
+                                      verbose_name='Nom contact')
+    contact_phone  = models.CharField(max_length=50,  blank=True,
+                                      verbose_name='Téléphone')
+    contact_phone2 = models.CharField(max_length=50,  blank=True,
+                                      verbose_name='Téléphone 2')
+    contact_email  = models.CharField(max_length=200, blank=True,
+                                      verbose_name='Email')
+    contact_agency = models.CharField(max_length=200, blank=True,
+                                      verbose_name='Agence / Promoteur')
+    contact_type   = models.CharField(max_length=20,  blank=True,
+                                      choices=CONTACT_TYPE_CHOICES,
+                                      verbose_name='Type contact')
 
     # Méta
     url        = models.URLField(max_length=500, blank=True)
