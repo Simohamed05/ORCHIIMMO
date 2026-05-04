@@ -102,16 +102,14 @@ def property_list(request):
     # Liste des sources disponibles pour le panneau scraping
     from .scraper import SCRAPERS
     scrape_sources = [
-        ('mubawab',      'Mubawab'),
-        ('avito',        'Avito'),
-        ('sarouty',      'Sarouty'),
-        ('sekna',        'Sekna'),
-        ('selectimmo',   'SelectImmo'),
-        ('logiqueimmo',  'LogiqueImmo'),
-        ('marocannonce', 'MarocAnnonce'),
-        ('maisonmaroc',  'MaisonMaroc'),
-        ('keurimmo',     'Keurimmo'),
-        ('immobilier',   'Immobilier.ma'),
+        ('mubawab',       'Mubawab'),
+        ('avito',         'Avito'),
+        ('sarouty',       'Sarouty'),
+        ('agenz',         'Agenz'),
+        ('marocannonces', 'MarocAnnonces'),
+        ('masaken',       'Masaken'),
+        ('logicimmo',     'LogicImmo'),
+        ('bikhir',        'Bikhir'),
     ]
 
     return render(request, 'properties/list.html', {
@@ -190,7 +188,7 @@ def scrape_stream(request):
       city      = filtre ville optionnel
     """
     sources_param = request.GET.get('sources',
-        'mubawab,avito,sarouty,sekna,selectimmo,logiqueimmo,marocannonce,maisonmaroc,keurimmo,immobilier'
+        'mubawab,avito,sarouty,agenz,marocannonces,masaken,logicimmo,bikhir'
     )
     sources = [s.strip() for s in sources_param.split(',') if s.strip()]
 

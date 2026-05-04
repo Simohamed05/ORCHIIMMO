@@ -17,8 +17,8 @@ SCRAPE_INTERVAL_HOURS = 6
 SCRAPE_PAGES          = 3
 SCRAPE_SOURCES        = [
     'mubawab', 'avito', 'sarouty',
-    'sekna', 'selectimmo', 'logiqueimmo',
-    'marocannonce', 'maisonmaroc', 'keurimmo', 'immobilier',
+    'agenz', 'marocannonces', 'masaken',
+    'logicimmo', 'bikhir',
 ]
 INITIAL_DELAY_SECONDS = 45
 

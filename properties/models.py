@@ -2,17 +2,15 @@ from django.db import models
 
 class Property(models.Model):
     SOURCE_CHOICES = [
-        ('mubawab',      'Mubawab'),
-        ('avito',        'Avito'),
-        ('sarouty',      'Sarouty'),
-        ('sekna',        'Sekna'),
-        ('selectimmo',   'SelectImmo'),
-        ('logiqueimmo',  'LogiqueImmo'),
-        ('marocannonce', 'MarocAnnonce'),
-        ('maisonmaroc',  'MaisonMaroc'),
-        ('keurimmo',     'Keurimmo'),
-        ('immobilier',   'Immobilier.ma'),
-        ('autre',        'Autre'),
+        ('mubawab',       'Mubawab'),
+        ('avito',         'Avito'),
+        ('sarouty',       'Sarouty'),
+        ('agenz',         'Agenz'),
+        ('marocannonces', 'MarocAnnonces'),
+        ('masaken',       'Masaken'),
+        ('logicimmo',     'LogicImmo'),
+        ('bikhir',        'Bikhir'),
+        ('autre',         'Autre'),
     ]
     TYPE_CHOICES = [
         ('apartment', 'Appartement'), ('villa', 'Villa / Maison'),
