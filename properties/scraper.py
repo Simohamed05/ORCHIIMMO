@@ -237,6 +237,34 @@ def _make_listing(source, city, dist, ptype, title, price_mad, area_m2,
     return result
 
 
+def _enrich_contact(session: requests.Session, listing: dict) -> dict:
+    url = listing.get('url')
+    if not url or not url.startswith('http'):
+        return listing
+
+    try:
+        r = session.get(url, timeout=15, allow_redirects=True)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.text, 'lxml')
+            full_text = soup.get_text(' ')
+            
+            if not listing.get('contact_phone'):
+                phones = _extract_phones(full_text)
+                if phones:
+                    listing['contact_phone'] = phones[0]
+                    if len(phones) > 1:
+                        listing['contact_phone2'] = phones[1]
+                        
+            if not listing.get('contact_email'):
+                email = _extract_email(full_text)
+                if email:
+                    listing['contact_email'] = email
+    except Exception as e:
+        logger.debug(f"[Enrich Contact] {url} : {e}")
+        
+    return listing
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. MUBAWAB
 # ══════════════════════════════════════════════════════════════════════════════
@@ -267,7 +295,7 @@ class MubawabScraper:
                     if listing:
                         if city_filter and city_filter.lower() not in listing['city'].lower():
                             continue
-                        yield listing
+                        yield _enrich_contact(session, listing)
                 if page < max_pages:
                     _delay()
 
@@ -345,7 +373,7 @@ class AvitoScraper:
                     if listing:
                         if city_filter and city_filter.lower() not in listing['city'].lower():
                             continue
-                        yield listing
+                        yield _enrich_contact(session, listing)
             except Exception as e:
                 logger.warning(f'[Avito] page {page}: {e}')
                 break
@@ -498,7 +526,7 @@ class SaroutyScraper:
                 for listing in listings:
                     if city_filter and city_filter.lower() not in listing['city'].lower():
                         continue
-                    yield listing
+                    yield _enrich_contact(session, listing)
 
                 if page < max_pages:
                     _delay()
@@ -618,7 +646,7 @@ class AgenzScraper:
                 for listing in listings:
                     if city_filter and city_filter.lower() not in listing['city'].lower():
                         continue
-                    yield listing
+                    yield _enrich_contact(session, listing)
 
             except Exception as e:
                 logger.warning(f'[Agenz] page {page}: {e}')
@@ -768,7 +796,7 @@ class MarocAnnoncesScraper:
                 if listing:
                     if city_filter and city_filter.lower() not in listing['city'].lower():
                         continue
-                    yield listing
+                    yield _enrich_contact(session, listing)
 
             if page < max_pages:
                 _delay()
@@ -848,7 +876,7 @@ class MasakenScraper:
                         break
 
                     for listing in listings:
-                        yield listing
+                        yield _enrich_contact(session, listing)
 
                     if page < max_pages:
                         _delay(0.8, 1.5)
@@ -944,7 +972,7 @@ class LogicImmoScraper:
                     if listing:
                         if city_filter and city_filter.lower() not in listing['city'].lower():
                             continue
-                        yield listing
+                        yield _enrich_contact(session, listing)
 
                 if page < max_pages:
                     _delay()
@@ -1045,7 +1073,7 @@ class BikhirScraper:
                 if listing:
                     if city_filter and city_filter.lower() not in listing['city'].lower():
                         continue
-                    yield listing
+                    yield _enrich_contact(session, listing)
 
             if page < max_pages:
                 _delay()
@@ -1171,7 +1199,7 @@ def scrape_all(sources: list = None, max_pages: int = 5,
 
                 listing['total_new'] = total_new
                 listing['total_dup'] = total_dup
-                yield listing
+                yield _enrich_contact(session, listing)
 
         except Exception as e:
             logger.error(f'[{source_name}] Crash: {e}', exc_info=True)
