@@ -58,5 +58,90 @@
                  transition:opacity 0.3s,transform 0.3s;">
     <i class="bi bi-chevron-up"></i>
   </button>
+
+  <!-- ═══ N8N CHATBOT WIDGET ════════════════════════════════════════════ -->
+  <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
+  <style>
+    :root {
+      --chat--color-primary:           #4895EF;
+      --chat--color-primary-shade-50:  #3a7acc;
+      --chat--color-primary-shade-100: #2d5f99;
+      --chat--color-secondary:         #7C3AED;
+      --chat--color-secondary-shade-50:#6930c3;
+      --chat--color-white:             #E2E8F0;
+      --chat--color-light:             #1A1F35;
+      --chat--color-light-shade-50:    #121728;
+      --chat--color-light-shade-100:   #0D1120;
+      --chat--color-medium:            #8892A4;
+      --chat--color-dark:              #E2E8F0;
+      --chat--color-disabled:          #4A5568;
+      --chat--color-typing:            #4895EF;
+      --chat--header--background:      linear-gradient(135deg,#4895EF,#7C3AED);
+      --chat--header--color:           #ffffff;
+      --chat--message--bot--background:  #1A1F35;
+      --chat--message--bot--color:       #E2E8F0;
+      --chat--message--user--background: linear-gradient(135deg,#4895EF,#7C3AED);
+      --chat--message--user--color:      #ffffff;
+      --chat--input--background:       #121728;
+      --chat--input--border-color:     rgba(72,149,239,0.3);
+      --chat--input--text-color:       #E2E8F0;
+      --chat--input--placeholder--color:#8892A4;
+      --chat--input--send--button--background: linear-gradient(135deg,#4895EF,#7C3AED);
+      --chat--input--send--button--color: #fff;
+      --chat--window--background:      #0D1120;
+      --chat--window--border-color:    rgba(72,149,239,0.15);
+      --chat--toggle--background:      linear-gradient(135deg,#4895EF,#7C3AED);
+      --chat--toggle--hover--background:linear-gradient(135deg,#3a7acc,#6930c3);
+      --chat--toggle--color:           #ffffff;
+      --chat--toggle--size:            56px;
+      --chat--border-radius:           14px;
+    }
+    body.light-mode {
+      --chat--color-light:             #F1F5FB;
+      --chat--color-light-shade-50:    #E2E8F0;
+      --chat--color-light-shade-100:   #CBD5E0;
+      --chat--color-dark:              #0F172A;
+      --chat--message--bot--background:#FFFFFF;
+      --chat--message--bot--color:     #0F172A;
+      --chat--input--background:       #FFFFFF;
+      --chat--input--text-color:       #0F172A;
+      --chat--window--background:      #F1F5FB;
+    }
+    /* Positionner au-dessus du bouton scroll-to-top (z-index 999) */
+    .n8n-chat .chat-toggle {
+      bottom: 88px !important;
+      right:  24px  !important;
+      z-index: 1000 !important;
+      box-shadow: 0 4px 20px rgba(72,149,239,0.4) !important;
+    }
+    .n8n-chat .chat-window {
+      z-index: 1001 !important;
+      border: 1px solid rgba(72,149,239,0.15) !important;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6) !important;
+    }
+  </style>
+  <script type="module">
+  import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+  createChat({
+    webhookUrl: 'https://simohamedhadi.app.n8n.cloud/webhook/59296bb7-cade-4ffa-b9f9-da4bc0b1208a/chat',
+    mode: 'window',
+    showWelcomeScreen: false,
+    initialMessages: [
+      '🏠 Bonjour ! Je suis l\'assistant IA d\'Orchiimmo.',
+      'Je peux vous aider à estimer un prix, explorer le catalogue ou répondre à vos questions sur l\'immobilier marocain.'
+    ],
+    i18n: {
+      en: {
+        title: 'Assistant Orchiimmo',
+        subtitle: 'IA Immobilier Maroc 🇲🇦',
+        footer: '',
+        getStarted: 'Nouvelle conversation',
+        inputPlaceholder: 'Posez votre question…',
+        closeButtonTooltip: 'Fermer',
+      },
+    },
+  });
+  </script>
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
 </body>
 </html>
