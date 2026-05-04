@@ -468,7 +468,7 @@ class AvitoScraper:
 
 class SaroutyScraper:
     SOURCE = 'sarouty'
-    # WordPress SSR pages
+    # WordPress SSR pages — no brotli to get readable HTML
     PAGES_URLS = [
         'https://www.sarouty.ma/acheter/appartements-a-vendre/',
         'https://www.sarouty.ma/acheter/villas-a-vendre/',
@@ -478,6 +478,7 @@ class SaroutyScraper:
 
     def scrape(self, max_pages=3, city_filter='') -> Iterator[dict]:
         session = _new_session()
+        session.headers.update({'Accept-Encoding': 'gzip, deflate'})  # no brotli
         # First visit homepage to get cookies
         try:
             session.get('https://www.sarouty.ma/', timeout=15)
@@ -819,31 +820,36 @@ class MarocAnnoncesScraper:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 6. MASAKEN
+# 6. MASAKEN  (JSON-LD Schema.org ItemList — confirmé fonctionnel)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class MasakenScraper:
     SOURCE  = 'masaken'
-    # Scraper par ville car pas d'URL globale fonctionnelle
     VILLES  = ['casablanca', 'marrakech', 'rabat', 'tanger', 'agadir',
-               'fes', 'meknes', 'oujda', 'kenitra', 'tetouan', 'sale']
+               'fes', 'meknes', 'oujda', 'kenitra', 'tetouan', 'sale',
+               'mohammedia', 'temara', 'beni-mellal', 'el-jadida']
     TYPES   = ['appartement', 'villa', 'terrain']
     BASE    = 'https://www.masaken.ma/fr/vendre/{ptype}/{ville}'
 
     def scrape(self, max_pages=2, city_filter='') -> Iterator[dict]:
         session = _new_session()
-        villes = [city_filter.lower()] if city_filter else self.VILLES
+        # Disable brotli to get readable HTML
+        session.headers.update({'Accept-Encoding': 'gzip, deflate'})
+        villes = [city_filter.lower().replace(' ', '-')] if city_filter else self.VILLES
 
         for ville in villes:
             for ptype in self.TYPES:
                 url = self.BASE.format(ptype=ptype, ville=ville)
                 for page in range(1, max_pages + 1):
                     page_url = url if page == 1 else f'{url}?page={page}'
-                    soup = _get(session, page_url)
-                    if not soup:
+                    try:
+                        r = session.get(page_url, timeout=20, allow_redirects=True)
+                        if r.status_code != 200:
+                            break
+                    except Exception:
                         break
 
-                    listings = self._extract(soup, ville, ptype)
+                    listings = self._extract_jsonld(r.text, ville, ptype)
                     if not listings:
                         break
 
@@ -853,59 +859,70 @@ class MasakenScraper:
                     if page < max_pages:
                         _delay(0.8, 1.5)
 
-    def _extract(self, soup: BeautifulSoup, ville: str, ptype: str) -> list:
+    def _extract_jsonld(self, html: str, ville: str, ptype: str) -> list:
+        """Extrait les annonces depuis le JSON-LD Schema.org ItemList."""
         results = []
-        seen = set()
+        # Find the ItemList JSON-LD
+        m = re.search(r'"@type":\s*"ItemList".*?(?=</script>)', html, re.DOTALL)
+        if not m:
+            return []
+        try:
+            # Wrap and clean control characters
+            raw = '{' + m.group(0)
+            raw = re.sub(r'[\x00-\x1f\x7f]', ' ', raw)
+            data = json.loads(raw)
+            items = data.get('itemListElement', [])
+        except Exception:
+            # Fallback: regex extract individual fields
+            items = []
+            urls   = re.findall(r'"url":\s*"(https://www\.masaken\.ma/[^"]+)"', html)
+            names  = re.findall(r'"name":\s*"([^"]+)"', html)
+            prices = re.findall(r'"price":\s*"([\d.]+)"', html)
+            currencies = re.findall(r'"priceCurrency":\s*"(\w+)"', html)
+            for i, url in enumerate(urls[:20]):
+                items.append({
+                    'url': url,
+                    'name': names[i] if i < len(names) else '',
+                    'offers': {
+                        'price': prices[i] if i < len(prices) else '0',
+                        'priceCurrency': currencies[i] if i < len(currencies) else 'MAD',
+                    }
+                })
 
-        # Cherche tous les blocs avec prix MAD
-        price_nodes = soup.find_all(string=re.compile(r'[\d\s.,]+\s*MAD'))
-        for node in price_nodes:
+        for item in items:
             try:
-                price_mad = _parse_price_mad(node)
+                url   = item.get('url', '')
+                name  = str(item.get('name', ''))[:300]
+                offers = item.get('offers', {})
+                price_raw = str(offers.get('price', 0))
+                currency  = str(offers.get('priceCurrency', 'MAD')).upper()
+
+                price_mad = _parse_price_mad(price_raw + ' ' + currency)
                 if not price_mad:
+                    try:
+                        val = float(price_raw.replace(',', '.'))
+                        price_mad = round(val * EUR_TO_MAD if currency in ('EUR', '€') else val)
+                    except Exception:
+                        continue
+
+                if not (50_000 <= price_mad <= 500_000_000):
                     continue
 
-                # Monter pour trouver le container
-                container = node.parent
-                for _ in range(8):
-                    if container is None:
-                        break
-                    t = container.get_text(' ')
-                    if 'm²' in t and len(t) > 30:
-                        break
-                    container = container.parent
+                # Parse surface and bedrooms from name (ex: "Appartement 3 pièces 58 m²")
+                area_m2  = _parse_area(name)
+                bedrooms_m = re.search(r'(\d+)\s*(?:pièces?|chambres?|ch\.?)', name, re.I)
+                bedrooms = int(bedrooms_m.group(1)) if bedrooms_m else None
 
-                if not container:
-                    continue
-
-                full_text = container.get_text(' ')
-                key = full_text[:60]
-                if key in seen:
-                    continue
-                seen.add(key)
-
-                area_m2  = _parse_area(full_text)
-                bedrooms = _parse_int(re.search(r'(\d+)\s*(?:ch|chambre)', full_text, re.I).group(1)) if re.search(r'(\d+)\s*(?:ch|chambre)', full_text, re.I) else None
-
-                link_tag = container.find('a', href=True)
-                href = ''
-                if link_tag:
-                    href = link_tag['href']
-                    if not href.startswith('http'):
-                        href = 'https://www.masaken.ma' + href
-
-                title_el = container.find(['h2', 'h3', 'h4', 'a'])
-                title = (title_el.get_text(strip=True) if title_el else '')[:300]
-
-                phones   = _extract_phones(full_text)
-                contact  = {**_empty_contact(),
-                            'contact_phone': phones[0] if phones else '',
-                            'contact_phone2': phones[1] if len(phones) > 1 else ''}
+                # City from URL or passed ville
+                city = ville.replace('-', ' ').title()
+                url_city_m = re.search(r'vente-\w+?-([^/]+)/\d+$', url)
+                if url_city_m:
+                    city = url_city_m.group(1).replace('-', ' ').title()
 
                 results.append(_make_listing(
-                    self.SOURCE, ville.title(), '',
-                    _guess_type(ptype), title, price_mad,
-                    area_m2, bedrooms, None, href, contact
+                    self.SOURCE, city, '',
+                    _guess_type(ptype + ' ' + name), name,
+                    price_mad, area_m2, bedrooms, None, url
                 ))
             except Exception:
                 continue
@@ -994,6 +1011,10 @@ class LogicImmoScraper:
         # Localisation depuis .location ou .address
         loc_el = card.select_one('[class*="location"], [class*="address"], [class*="quartier"]')
         district = loc_el.get_text(strip=True) if loc_el else ''
+
+        # Filtre: prix minimum 100 000 DH pour une vente (évite les loyers)
+        if price_mad < 100_000:
+            return None
 
         return _make_listing(
             self.SOURCE, city, district,
@@ -1172,10 +1193,13 @@ def scrape_all(sources: list = None, max_pages: int = 5,
                 listing['total_new'] = total_new
                 listing['total_dup'] = total_dup
                 yield listing
-:
-                    listing['is_new'] = False
-                    total_dup += 1
 
-                listing['total_new'] = total_new
-                listing['total_dup'] = total_dup
-                yield _enrich_contact(session, listing)
+        except Exception as e:
+            logger.error(f'[Scraper] Erreur source {source_name}: {e}')
+            yield {
+                'error': str(e),
+                'source': source_name,
+                'is_new': False,
+                'total_new': total_new,
+                'total_dup': total_dup,
+            }
