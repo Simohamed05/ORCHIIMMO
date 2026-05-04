@@ -97,15 +97,45 @@
       --chat--border-radius:           14px;
     }
     body.light-mode {
-      --chat--color-light:             #F1F5FB;
-      --chat--color-light-shade-50:    #E2E8F0;
-      --chat--color-light-shade-100:   #CBD5E0;
-      --chat--color-dark:              #0F172A;
-      --chat--message--bot--background:#FFFFFF;
-      --chat--message--bot--color:     #0F172A;
-      --chat--input--background:       #FFFFFF;
-      --chat--input--text-color:       #0F172A;
-      --chat--window--background:      #F1F5FB;
+      /* Fond général */
+      --chat--color-light:                      #F1F5FB;
+      --chat--color-light-shade-50:             #E2E8F0;
+      --chat--color-light-shade-100:            #CBD5E0;
+      --chat--color-dark:                       #0F172A;
+      --chat--color-medium:                     #475569;
+      /* Fenêtre */
+      --chat--window--background:               #F1F5FB;
+      --chat--window--border-color:             rgba(72,149,239,0.2);
+      /* Messages bot */
+      --chat--message--bot--background:         #FFFFFF;
+      --chat--message--bot--color:              #0F172A;
+      /* Messages utilisateur — gradient conservé, texte blanc forcé */
+      --chat--message--user--background:        linear-gradient(135deg,#4895EF,#7C3AED);
+      --chat--message--user--color:             #FFFFFF;
+      /* Champ de saisie */
+      --chat--input--background:                #FFFFFF;
+      --chat--input--border-color:              rgba(72,149,239,0.4);
+      --chat--input--text-color:                #0F172A;
+      --chat--input--placeholder--color:        #94A3B8;
+      /* Header */
+      --chat--header--background:               linear-gradient(135deg,#4895EF,#7C3AED);
+      --chat--header--color:                    #FFFFFF;
+      /* Typage */
+      --chat--color-typing:                     #4895EF;
+    }
+    /* Forcer le texte blanc sur les bulles utilisateur en mode clair */
+    body.light-mode .n8n-chat .chat-message.chat-message-from-user,
+    body.light-mode .n8n-chat .chat-message.chat-message-from-user * {
+      color: #FFFFFF !important;
+    }
+    /* Améliorer la lisibilité générale en mode clair */
+    body.light-mode .n8n-chat .chat-messages {
+      background: #F1F5FB;
+    }
+    body.light-mode .n8n-chat .chat-message.chat-message-from-bot {
+      color: #0F172A !important;
+      background: #FFFFFF !important;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     }
     /* Positionner au-dessus du bouton scroll-to-top (z-index 999) */
     .n8n-chat .chat-toggle {
