@@ -123,7 +123,7 @@
   <script type="module">
   import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
   createChat({
-    webhookUrl: 'https://simohamedhadi.app.n8n.cloud/webhook/59296bb7-cade-4ffa-b9f9-da4bc0b1208a/chat',
+    webhookUrl: window.location.origin + '/chatbot/',
     mode: 'window',
     showWelcomeScreen: false,
     initialMessages: [

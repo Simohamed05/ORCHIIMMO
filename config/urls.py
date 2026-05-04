@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path, include, reverse_lazy
 from django.shortcuts import render
 from django.contrib.auth import views as auth_views
+from .chatbot_proxy import chatbot_proxy
 
 # Données statiques Maroc pour la home page
 TOP_VILLES = [
@@ -24,6 +25,7 @@ urlpatterns = [
     path('predict/',     include('predictions.urls', namespace='predictions')),
     path('properties/',  include('properties.urls',  namespace='properties')),
     path('dashboards/',  include('dashboards.urls',  namespace='dashboards')),
+    path('chatbot/',     chatbot_proxy,                                  name='chatbot_proxy'),
 
     # ─── Password Reset (Django built-in) ───────────────────────────────────
     path('accounts/password-reset/',
