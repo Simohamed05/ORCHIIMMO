@@ -122,6 +122,19 @@
   </style>
   <script type="module">
   import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+
+  // ── Nouvelle session à chaque chargement de page ──────────────────────────
+  // Le widget stocke le sessionId dans localStorage → n8n retrouve l'historique
+  // de la session précédente. On efface les clés chat/n8n pour repartir de zéro.
+  try {
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.includes('n8n') || k.includes('chat'))) toRemove.push(k);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
+
   createChat({
     webhookUrl: window.location.origin + '/chatbot/',
     mode: 'window',

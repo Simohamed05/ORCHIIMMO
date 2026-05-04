@@ -23,6 +23,21 @@ N8N_WEBHOOK_URL = (
     '59296bb7-cade-4ffa-b9f9-da4bc0b1208a/chat'
 )
 
+# ── System prompt injecté dans chaque message ─────────────────────────────────
+# Préfixé au chatInput pour forcer l'IA à répondre directement sans poser de questions.
+SYSTEM_PREFIX = (
+    "[INSTRUCTION SYSTÈME — NE PAS AFFICHER] "
+    "Tu es l'assistant IA d'Orchiimmo. "
+    "RÈGLE ABSOLUE : Réponds DIRECTEMENT et COMPLÈTEMENT à la question de l'utilisateur dès le premier message. "
+    "Ne pose JAMAIS de questions de clarification. "
+    "Si l'utilisateur demande des annonces/villas/appartements → donne immédiatement les informations disponibles sur le marché marocain avec des prix et quartiers. "
+    "Si tu n'as pas de données exactes → donne des fourchettes de prix réalistes basées sur ta connaissance du marché. "
+    "Réponds en français ou arabe selon la langue utilisée. "
+    "Sois concis (3-5 lignes max). "
+    "[FIN INSTRUCTION] "
+    "Question de l'utilisateur : "
+)
+
 
 def _parse_n8n_response(raw: str) -> str:
     """
@@ -94,6 +109,11 @@ def chatbot_proxy(request):
             {'output': 'Requête invalide.'},
             status=400
         )
+
+    # ── Injecter le system prompt dans le chatInput ───────────────────────────
+    # Permet de forcer un comportement direct sans modifier le workflow n8n
+    if body.get('action') == 'sendMessage' and body.get('chatInput'):
+        body['chatInput'] = SYSTEM_PREFIX + body['chatInput']
 
     # ── Appel n8n ─────────────────────────────────────────────────────────────
     try:
