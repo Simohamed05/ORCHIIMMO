@@ -1413,6 +1413,36 @@ def scrape_all(sources: list = None, max_pages: int = 5,
                 else:
                     listing['is_new'] = False
                     total_dup += 1
+                    # ── Mise à jour du contact si manquant en DB ─────────────
+                    has_contact = any([
+                        listing.get('contact_phone'),
+                        listing.get('contact_agency'),
+                        listing.get('contact_name'),
+                        listing.get('contact_email'),
+                    ])
+                    if has_contact and url:
+                        try:
+                            update_fields = {}
+                            prop_qs = Property.objects.filter(url=url)
+                            existing = prop_qs.first()
+                            if existing:
+                                if listing.get('contact_phone') and not existing.contact_phone:
+                                    update_fields['contact_phone'] = listing['contact_phone']
+                                if listing.get('contact_phone2') and not existing.contact_phone2:
+                                    update_fields['contact_phone2'] = listing['contact_phone2']
+                                if listing.get('contact_agency') and not existing.contact_agency:
+                                    update_fields['contact_agency'] = listing['contact_agency']
+                                if listing.get('contact_name') and not existing.contact_name:
+                                    update_fields['contact_name'] = listing['contact_name']
+                                if listing.get('contact_email') and not existing.contact_email:
+                                    update_fields['contact_email'] = listing['contact_email']
+                                if listing.get('contact_type') and not existing.contact_type:
+                                    update_fields['contact_type'] = listing['contact_type']
+                                if update_fields:
+                                    prop_qs.update(**update_fields)
+                                    listing['id'] = existing.pk
+                        except Exception as e:
+                            logger.debug(f'[DB] Update contact ({url[:40]}): {e}')
 
                 listing['total_new'] = total_new
                 listing['total_dup'] = total_dup
