@@ -39,28 +39,22 @@
 
       <!-- Sélection sources + pages -->
       <div class="col-lg-4">
-        <div class="d-flex gap-2 flex-wrap">
-          <div class="form-check form-check-inline">
-            <input class="form-check-input" type="checkbox" id="src-mubawab"
-                   value="mubawab" checked>
-            <label class="form-check-label text-white small" for="src-mubawab">
-              Mubawab
+        <div class="d-flex gap-2 flex-wrap mb-2" style="max-height:90px;overflow-y:auto;">
+          {% for src_val, src_label in scrape_sources %}
+          <div class="form-check form-check-inline mb-1">
+            <input class="form-check-input scrape-src-cb" type="checkbox"
+                   id="src-{{ src_val }}" value="{{ src_val }}" checked>
+            <label class="form-check-label text-white small fw-semibold" for="src-{{ src_val }}">
+              {{ src_label }}
             </label>
           </div>
-          <div class="form-check form-check-inline">
-            <input class="form-check-input" type="checkbox" id="src-sarouty"
-                   value="sarouty" checked>
-            <label class="form-check-label text-white small" for="src-sarouty">
-              Sarouty
-            </label>
-          </div>
-          <div class="form-check form-check-inline">
-            <input class="form-check-input" type="checkbox" id="src-avito"
-                   value="avito" checked>
-            <label class="form-check-label text-white small" for="src-avito">
-              Avito
-            </label>
-          </div>
+          {% endfor %}
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <button class="btn btn-outline-light btn-sm py-0 px-2" style="font-size:.72rem;"
+                  onclick="toggleAllSources(true)" type="button">Tout</button>
+          <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size:.72rem;"
+                  onclick="toggleAllSources(false)" type="button">Aucun</button>
           <select id="scrape-pages" class="form-select form-select-sm"
                   style="width:auto;background:#1e2d4a;color:#e2e8f0;border-color:#334155;">
             <option value="2">2 pages</option>
@@ -487,10 +481,14 @@
 
 let evtSource = null;
 
+function toggleAllSources(checked) {
+  document.querySelectorAll('.scrape-src-cb').forEach(cb => cb.checked = checked);
+}
+
 function startScrape() {
-  // Sources sélectionnées
-  const sources = ['mubawab','sarouty','avito']
-    .filter(s => document.getElementById('src-' + s)?.checked)
+  // Sources sélectionnées dynamiquement depuis les checkboxes
+  const sources = Array.from(document.querySelectorAll('.scrape-src-cb:checked'))
+    .map(cb => cb.value)
     .join(',');
 
   if (!sources) {
@@ -590,7 +588,16 @@ function prependListing(d) {
     : '';
 
   const srcColors = {
-    mubawab: '#2563eb', sarouty: '#7c3aed', avito: '#16a34a'
+    mubawab:      '#2563eb',
+    avito:        '#16a34a',
+    sarouty:      '#7c3aed',
+    sekna:        '#dc2626',
+    selectimmo:   '#d97706',
+    logiqueimmo:  '#0891b2',
+    marocannonce: '#be185d',
+    maisonmaroc:  '#059669',
+    keurimmo:     '#7c3aed',
+    immobilier:   '#ea580c',
   };
   const srcColor = srcColors[d.source] || '#475569';
 
