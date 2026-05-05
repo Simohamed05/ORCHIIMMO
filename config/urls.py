@@ -17,8 +17,6 @@ TOP_VILLES = [
 def home_view(request):
     return render(request, 'home.html', {'top_villes': TOP_VILLES})
 
-def mindmap_view(request):
-    return render(request, 'mindmap.html')
 
 
 urlpatterns = [
@@ -29,7 +27,6 @@ urlpatterns = [
     path('properties/',  include('properties.urls',  namespace='properties')),
     path('dashboards/',  include('dashboards.urls',  namespace='dashboards')),
     path('chatbot/',     chatbot_proxy,                                  name='chatbot_proxy'),
-    path('mindmap/',     mindmap_view,                                   name='mindmap'),
 
     # ─── Password Reset (Django built-in) ───────────────────────────────────
     path('accounts/password-reset/',
