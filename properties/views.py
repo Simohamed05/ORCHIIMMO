@@ -41,7 +41,7 @@ def property_list(request):
     a_min    = request.GET.get('area_min',  '').strip()
     a_max    = request.GET.get('area_max',  '').strip()
     opport   = request.GET.get('opportunity','').strip()
-    sort_by  = request.GET.get('sort',      'price_mad')
+    sort_by  = request.GET.get('sort',      'recent')
 
     if city:
         qs = qs.filter(city__iexact=city)
@@ -77,7 +77,7 @@ def property_list(request):
         'area_m2':    '-area_m2',
         'recent':     '-scraped_at',
     }
-    qs = qs.order_by(sort_map.get(sort_by, 'price_mad'))
+    qs = qs.order_by(sort_map.get(sort_by, '-scraped_at'))
 
     total = qs.count()
 

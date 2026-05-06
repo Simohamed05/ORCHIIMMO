@@ -219,10 +219,10 @@
               <span data-lang-ar>ترتيب حسب</span>
             </label>
             <select name="sort" class="form-select form-select-sm i18n-select">
+              <option value="recent"     data-fr="Plus récent"      data-ar="الأحدث"         {% if f_sort == 'recent'     or not f_sort %}selected{% endif %}>Plus récent</option>
               <option value="price_mad"  data-fr="Prix croissant"   data-ar="السعر تصاعدي"  {% if f_sort == 'price_mad'  %}selected{% endif %}>Prix croissant</option>
               <option value="price_desc" data-fr="Prix décroissant" data-ar="السعر تنازلي"  {% if f_sort == 'price_desc' %}selected{% endif %}>Prix décroissant</option>
               <option value="area_m2"    data-fr="Surface"          data-ar="المساحة"        {% if f_sort == 'area_m2'    %}selected{% endif %}>Surface</option>
-              <option value="recent"     data-fr="Récent"           data-ar="الأحدث"         {% if f_sort == 'recent'     %}selected{% endif %}>Récent</option>
             </select>
           </div>
 
