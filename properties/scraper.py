@@ -15,7 +15,8 @@ import time
 import random
 import json
 import logging
-from datetime import date, datetime
+from datetime import date
+from django.utils import timezone
 from typing import Iterator, Optional
 
 import requests
@@ -373,7 +374,7 @@ def _make_listing(source, city, dist, ptype, title, price_mad, area_m2,
         'bedrooms':         bedrooms,
         'bathrooms':        bathrooms,
         'url':              (url or '')[:500],
-        'scraped_at':       datetime.now().isoformat(),
+        'scraped_at':       timezone.now().isoformat(),
     }
     result.update(contact or _empty_contact())
     return result
@@ -1413,7 +1414,7 @@ def scrape_all(sources: list = None, max_pages: int = 5,
                             bedrooms         = listing.get('bedrooms'),
                             bathrooms        = listing.get('bathrooms'),
                             url              = url,
-                            scraped_at       = datetime.now(),
+                            scraped_at       = timezone.now(),
                             is_opportunity   = listing.get('is_opportunity', False),
                             contact_name     = listing.get('contact_name', ''),
                             contact_phone    = listing.get('contact_phone', ''),
