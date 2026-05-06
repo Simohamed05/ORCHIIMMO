@@ -15,7 +15,7 @@ import time
 import random
 import json
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Iterator, Optional
 
 import requests
@@ -373,7 +373,7 @@ def _make_listing(source, city, dist, ptype, title, price_mad, area_m2,
         'bedrooms':         bedrooms,
         'bathrooms':        bathrooms,
         'url':              (url or '')[:500],
-        'scraped_at':       date.today().isoformat(),
+        'scraped_at':       datetime.now().isoformat(),
     }
     result.update(contact or _empty_contact())
     return result
@@ -1413,7 +1413,7 @@ def scrape_all(sources: list = None, max_pages: int = 5,
                             bedrooms         = listing.get('bedrooms'),
                             bathrooms        = listing.get('bathrooms'),
                             url              = url,
-                            scraped_at       = date.today(),
+                            scraped_at       = datetime.now(),
                             is_opportunity   = listing.get('is_opportunity', False),
                             contact_name     = listing.get('contact_name', ''),
                             contact_phone    = listing.get('contact_phone', ''),

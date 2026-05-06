@@ -165,9 +165,14 @@ def property_list(request):
         'price_mad':  'price_mad',
         'price_desc': '-price_mad',
         'area_m2':    '-area_m2',
-        'recent':     '-scraped_at',
+        'recent':     '-id',   # id croissant = ordre d'insertion réel
     }
-    qs = qs.order_by(sort_map.get(sort_by, '-scraped_at'))
+    # Tri principal + secondaire par -id pour garantir l'ordre d'insertion
+    primary = sort_map.get(sort_by, '-id')
+    if primary in ('-id',):
+        qs = qs.order_by(primary)
+    else:
+        qs = qs.order_by(primary, '-id')
 
     total = qs.count()
 

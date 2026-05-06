@@ -82,7 +82,8 @@ class Property(models.Model):
 
     # Méta
     url        = models.URLField(max_length=500, blank=True)
-    scraped_at = models.DateField(null=True, blank=True)
+    scraped_at = models.DateTimeField(null=True, blank=True,
+                                      verbose_name='Date/Heure scraping')
 
     class Meta:
         ordering         = ['city', 'price_mad']
