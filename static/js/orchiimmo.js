@@ -67,6 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
       langLabel && (langLabel.textContent = 'AR');
       langBtn?.setAttribute('title', 'العربية / الدارجة');
     }
+    // ── Mettre à jour le texte des <option> dans les <select> bilingues ──
+    document.querySelectorAll('option[data-fr]').forEach(opt => {
+      opt.textContent = (lang === 'ar') ? (opt.dataset.ar || opt.dataset.fr) : opt.dataset.fr;
+    });
     localStorage.setItem('orchiimmo-lang', lang);
   }
 

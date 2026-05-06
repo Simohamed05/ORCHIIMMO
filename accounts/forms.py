@@ -1,6 +1,8 @@
+import re
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from .models import UserProfile
 
 class RegisterForm(UserCreationForm):
@@ -20,8 +22,25 @@ class RegisterForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['password1'].widget.attrs.update({'class':'form-control'})
-        self.fields['password2'].widget.attrs.update({'class':'form-control'})
+        self.fields['password1'].widget.attrs.update({'class': 'form-control', 'id': 'id_password1'})
+        self.fields['password2'].widget.attrs.update({'class': 'form-control', 'id': 'id_password2'})
+
+    def clean_password2(self):
+        pwd = self.cleaned_data.get('password2', '')
+        errors = []
+        if len(pwd) < 8:
+            errors.append("Au moins 8 caractères.")
+        if not re.search(r'[A-Z]', pwd):
+            errors.append("Au moins 1 lettre majuscule (A-Z).")
+        if not re.search(r'[a-z]', pwd):
+            errors.append("Au moins 1 lettre minuscule (a-z).")
+        if not re.search(r'\d', pwd):
+            errors.append("Au moins 1 chiffre (0-9).")
+        if not re.search(r'[!@#$%^&*()\-_=+\[\]{};:\'",.<>?/\\|`~]', pwd):
+            errors.append("Au moins 1 caractère spécial (!@#$%...).")
+        if errors:
+            raise ValidationError(errors)
+        return super().clean_password2()
 
 class ProfileForm(forms.ModelForm):
     class Meta:

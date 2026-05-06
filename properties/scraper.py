@@ -54,12 +54,19 @@ _EMAIL_RE = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
 # ── Utilitaires prix / surface ────────────────────────────────────────────────
 
 def _parse_price_mad(raw: str) -> Optional[float]:
+    """
+    Parse un prix et retourne la valeur en MAD.
+    Regle stricte : DH, MAD, euro ou EUR requis dans le texte source.
+    Evite de parser des surfaces m2, references ou codes postaux.
+    """
     if not raw:
         return None
-    raw = raw.replace('\xa0', ' ').replace(' ', '').replace(' ', '').strip()
-    is_eur = bool(re.search(r'[€]|eur|euro', raw, re.I))
+    original = str(raw)
+    raw = raw.replace(' ', ' ').replace(' ', '').replace(' ', '').strip()
+    is_eur = bool(re.search(r'[€]|eur|euro', original, re.I))
+    has_currency = bool(re.search(r'DH|MAD|€|eur|euro', original, re.I))
 
-    # "3.5 Million DH" ou "3.5M DH" — mais PAS "215 m²"
+    # "3.5 Million DH" ou "3.5M DH" -- mais PAS "215 m2"
     m = re.search(r'([\d.,]+)\s*(?:Million|Millions|MDH|M\s*DH|M\s*MAD)', raw, re.I)
     if m:
         try:
@@ -68,7 +75,7 @@ def _parse_price_mad(raw: str) -> Optional[float]:
         except ValueError:
             pass
 
-    k = re.search(r'([\d.,]+)\s*[Kk]', raw)
+    k = re.search(r'([\d.,]+)\s*[Kk](?:\s*DH|\s*MAD|$)', raw)
     if k:
         try:
             val = float(k.group(1).replace(',', '.')) * 1_000
@@ -76,9 +83,18 @@ def _parse_price_mad(raw: str) -> Optional[float]:
         except ValueError:
             pass
 
+    # Fallback strip-digits : EXIGER DH/MAD/EUR dans le texte original
+    if not has_currency:
+        return None
+
     cleaned = re.sub(r'[\s ]', '', raw)
     cleaned = re.sub(r'[^\d,.]', '', cleaned)
-    cleaned = cleaned.replace(',', '').replace('.', '')
+    if cleaned.count('.') > 1:
+        cleaned = cleaned.replace('.', '')
+    elif cleaned.count(',') > 1:
+        cleaned = cleaned.replace(',', '')
+    else:
+        cleaned = cleaned.replace(',', '').replace('.', '')
     if cleaned.isdigit():
         val = float(cleaned)
         if is_eur:
@@ -86,8 +102,6 @@ def _parse_price_mad(raw: str) -> Optional[float]:
         if 50_000 <= val <= 500_000_000:
             return round(val)
     return None
-
-
 def _parse_area(raw: str) -> Optional[float]:
     m = re.search(r'([\d,. ]+)\s*m', str(raw), re.I)
     if m:
@@ -213,6 +227,7 @@ def _empty_contact() -> dict:
     return {
         'contact_name': '', 'contact_phone': '', 'contact_phone2': '',
         'contact_email': '', 'contact_agency': '', 'contact_type': '',
+        'contact_whatsapp': '',
     }
 
 
@@ -262,6 +277,9 @@ def _fetch_detail_contact(session, url: str) -> dict:
                     contact['contact_phone'] = phone
                 elif phone != contact['contact_phone'] and not contact['contact_phone2']:
                     contact['contact_phone2'] = phone
+                # Stocker l'URL WhatsApp complète (avec texte pré-rempli si dispo)
+                if not contact['contact_whatsapp']:
+                    contact['contact_whatsapp'] = href[:500]
 
         # ── 2. Liens tel: ────────────────────────────────────────────────────
         for tel_tag in soup.find_all('a', href=re.compile(r'^tel:')):
@@ -1403,6 +1421,7 @@ def scrape_all(sources: list = None, max_pages: int = 5,
                             contact_email    = listing.get('contact_email', ''),
                             contact_agency   = listing.get('contact_agency', ''),
                             contact_type     = listing.get('contact_type', ''),
+                            contact_whatsapp = listing.get('contact_whatsapp', ''),
                         )
                         listing['id']     = prop.pk
                         listing['is_new'] = True
@@ -1438,6 +1457,8 @@ def scrape_all(sources: list = None, max_pages: int = 5,
                                     update_fields['contact_email'] = listing['contact_email']
                                 if listing.get('contact_type') and not existing.contact_type:
                                     update_fields['contact_type'] = listing['contact_type']
+                                if listing.get('contact_whatsapp') and not existing.contact_whatsapp:
+                                    update_fields['contact_whatsapp'] = listing['contact_whatsapp']
                                 if update_fields:
                                     prop_qs.update(**update_fields)
                                     listing['id'] = existing.pk

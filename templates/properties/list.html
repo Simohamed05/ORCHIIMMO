@@ -145,11 +145,8 @@
               <span data-lang-fr>Ville</span>
               <span data-lang-ar>المدينة</span>
             </label>
-            <select name="city" class="form-select form-select-sm">
-              <option value="">
-                <span data-lang-fr>Toutes les villes</span>
-                <span data-lang-ar>كل المدن</span>
-              </option>
+            <select name="city" class="form-select form-select-sm i18n-select">
+              <option value="" data-fr="Toutes les villes" data-ar="كل المدن">Toutes les villes</option>
               {% for v in villes %}
                 <option value="{{ v }}" {% if f_city == v %}selected{% endif %}>{{ v }}</option>
               {% endfor %}
@@ -163,31 +160,14 @@
               <span data-lang-fr>Type de bien</span>
               <span data-lang-ar>نوع العقار</span>
             </label>
-            <select name="type" class="form-select form-select-sm">
-              <option value="">
-                <span data-lang-fr>Tous les types</span>
-                <span data-lang-ar>كل الأنواع</span>
-              </option>
-              <option value="apartment" {% if f_type == 'apartment' %}selected{% endif %}>
-                <span data-lang-fr>Appartement</span>
-                <span data-lang-ar>شقة</span>
-              </option>
-              <option value="villa"     {% if f_type == 'villa'     %}selected{% endif %}>
-                Villa / Maison
-              </option>
-              <option value="riad"      {% if f_type == 'riad'      %}selected{% endif %}>Riad</option>
-              <option value="land"      {% if f_type == 'land'      %}selected{% endif %}>
-                <span data-lang-fr>Terrain</span>
-                <span data-lang-ar>أرض</span>
-              </option>
-              <option value="office"    {% if f_type == 'office'    %}selected{% endif %}>
-                <span data-lang-fr>Bureau</span>
-                <span data-lang-ar>مكتب</span>
-              </option>
-              <option value="other"     {% if f_type == 'other'     %}selected{% endif %}>
-                <span data-lang-fr>Autre</span>
-                <span data-lang-ar>أخرى</span>
-              </option>
+            <select name="type" class="form-select form-select-sm i18n-select">
+              <option value=""           data-fr="Tous les types"  data-ar="كل الأنواع"   {% if f_type == ''          %}selected{% endif %}>Tous les types</option>
+              <option value="apartment"  data-fr="Appartement"     data-ar="شقة"           {% if f_type == 'apartment' %}selected{% endif %}>Appartement</option>
+              <option value="villa"      data-fr="Villa / Maison"  data-ar="فيلا / منزل"  {% if f_type == 'villa'     %}selected{% endif %}>Villa / Maison</option>
+              <option value="riad"       data-fr="Riad"            data-ar="رياض"          {% if f_type == 'riad'      %}selected{% endif %}>Riad</option>
+              <option value="land"       data-fr="Terrain"         data-ar="أرض"           {% if f_type == 'land'      %}selected{% endif %}>Terrain</option>
+              <option value="office"     data-fr="Bureau"          data-ar="مكتب"          {% if f_type == 'office'    %}selected{% endif %}>Bureau</option>
+              <option value="other"      data-fr="Autre"           data-ar="أخرى"          {% if f_type == 'other'     %}selected{% endif %}>Autre</option>
             </select>
           </div>
 
@@ -238,23 +218,11 @@
               <span data-lang-fr>Trier par</span>
               <span data-lang-ar>ترتيب حسب</span>
             </label>
-            <select name="sort" class="form-select form-select-sm">
-              <option value="price_mad"  {% if f_sort == 'price_mad'  %}selected{% endif %}>
-                <span data-lang-fr>Prix croissant</span>
-                <span data-lang-ar>السعر تصاعدي</span>
-              </option>
-              <option value="price_desc" {% if f_sort == 'price_desc' %}selected{% endif %}>
-                <span data-lang-fr>Prix décroissant</span>
-                <span data-lang-ar>السعر تنازلي</span>
-              </option>
-              <option value="area_m2"    {% if f_sort == 'area_m2'    %}selected{% endif %}>
-                <span data-lang-fr>Surface</span>
-                <span data-lang-ar>المساحة</span>
-              </option>
-              <option value="recent"     {% if f_sort == 'recent'     %}selected{% endif %}>
-                <span data-lang-fr>Récent</span>
-                <span data-lang-ar>الأحدث</span>
-              </option>
+            <select name="sort" class="form-select form-select-sm i18n-select">
+              <option value="price_mad"  data-fr="Prix croissant"   data-ar="السعر تصاعدي"  {% if f_sort == 'price_mad'  %}selected{% endif %}>Prix croissant</option>
+              <option value="price_desc" data-fr="Prix décroissant" data-ar="السعر تنازلي"  {% if f_sort == 'price_desc' %}selected{% endif %}>Prix décroissant</option>
+              <option value="area_m2"    data-fr="Surface"          data-ar="المساحة"        {% if f_sort == 'area_m2'    %}selected{% endif %}>Surface</option>
+              <option value="recent"     data-fr="Récent"           data-ar="الأحدث"         {% if f_sort == 'recent'     %}selected{% endif %}>Récent</option>
             </select>
           </div>
 

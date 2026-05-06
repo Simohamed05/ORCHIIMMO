@@ -83,11 +83,24 @@
                 <span data-lang-fr>Mot de passe *</span>
                 <span data-lang-ar>كلمة المرور *</span>
               </label>
-              <input type="password" name="password1" class="form-control"
-                     placeholder="8 caractères min." required>
+              <input type="password" name="password1" id="id_password1" class="form-control"
+                     placeholder="Ex: Maroc@2026" required autocomplete="new-password">
               {% if form.password1.errors %}
                 <div class="text-danger small mt-1">{{ form.password1.errors.0 }}</div>
               {% endif %}
+              <!-- Barre de force du mot de passe -->
+              <div class="mt-2">
+                <div style="height:4px;border-radius:2px;background:#2d3748;overflow:hidden;">
+                  <div id="pwd-bar" style="height:100%;width:0%;transition:width .3s,background .3s;border-radius:2px;"></div>
+                </div>
+                <div class="mt-2 small" id="pwd-rules">
+                  <span id="r-len"  class="me-2 text-muted"><i class="bi bi-circle me-1"></i>8 caractères</span>
+                  <span id="r-maj"  class="me-2 text-muted"><i class="bi bi-circle me-1"></i>Majuscule</span>
+                  <span id="r-min"  class="me-2 text-muted"><i class="bi bi-circle me-1"></i>Minuscule</span>
+                  <span id="r-num"  class="me-2 text-muted"><i class="bi bi-circle me-1"></i>Chiffre</span>
+                  <span id="r-spe"  class="me-2 text-muted"><i class="bi bi-circle me-1"></i>Spécial (!@#...)</span>
+                </div>
+              </div>
             </div>
             <div class="col-md-6">
               <label class="form-label">
@@ -165,4 +178,36 @@
 
   </div>
 </div>
+
+{% block extra_js %}
+<script>
+(function() {
+  const inp  = document.getElementById('id_password1');
+  if (!inp) return;
+  const bar  = document.getElementById('pwd-bar');
+  const rules = {
+    'r-len': v => v.length >= 8,
+    'r-maj': v => /[A-Z]/.test(v),
+    'r-min': v => /[a-z]/.test(v),
+    'r-num': v => /\d/.test(v),
+    'r-spe': v => /[!@#$%^&*()\-_=+\[\]{};:'",.<>?\/\\|`~]/.test(v),
+  };
+  inp.addEventListener('input', function() {
+    const v = this.value;
+    let score = 0;
+    Object.entries(rules).forEach(([id, fn]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const ok = fn(v);
+      if (ok) { score++; el.className = 'me-2 text-success'; el.querySelector('i').className = 'bi bi-check-circle-fill me-1'; }
+      else     { el.className = 'me-2 text-muted';   el.querySelector('i').className = 'bi bi-circle me-1'; }
+    });
+    const pct = (score / 5) * 100;
+    const colors = ['#EF4444','#F59E0B','#F59E0B','#06D6A0','#06D6A0'];
+    bar.style.width = pct + '%';
+    bar.style.background = colors[score - 1] || '#2d3748';
+  });
+})();
+</script>
+{% endblock %}
 {% endblock %}

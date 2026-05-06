@@ -289,9 +289,18 @@
         </a>
         {% endif %}
 
-        {% if prop.contact_phone %}
+        {% if prop.contact_whatsapp %}
+        <a href="{{ prop.contact_whatsapp }}"
+           target="_blank" rel="noopener"
+           class="btn w-100 mb-2 fw-bold"
+           style="background:#25D366;color:#fff;border:none;">
+          <i class="bi bi-whatsapp me-2"></i>
+          <span data-lang-fr>Contacter sur WhatsApp</span>
+          <span data-lang-ar>التواصل عبر واتساب</span>
+        </a>
+        {% elif prop.contact_phone %}
         <a href="https://wa.me/{{ prop.contact_phone|cut:' '|cut:'-' }}"
-           target="_blank"
+           target="_blank" rel="noopener"
            class="btn w-100 mb-2"
            style="background:#25D366;color:#fff;border:none;">
           <i class="bi bi-whatsapp me-2"></i>
