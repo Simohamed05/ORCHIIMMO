@@ -16,15 +16,98 @@ from .models import Property
 logger = logging.getLogger(__name__)
 
 
-# ── Villes disponibles (depuis la DB) ────────────────────────────────────────
+# ── Liste blanche officielle des villes marocaines ───────────────────────────
+# Forme normalisée (affichage) → variantes acceptées en DB (lowercase)
+VILLES_MAROC = {
+    'Agadir':        ['agadir', 'agadir melloul'],
+    'Ait Melloul':   ['ait melloul', 'aït melloul', 'inezgane ait melloul'],
+    'Al Hoceima':    ['al hoceima', 'al-hoceima'],
+    'Asilah':        ['asilah'],
+    'Azemmour':      ['azemmour'],
+    'Azrou':         ['azrou'],
+    'Beni Mellal':   ['beni mellal', 'béni mellal'],
+    'Berkane':       ['berkane'],
+    'Berrechid':     ['berrechid'],
+    'Benslimane':    ['benslimane'],
+    'Bouskoura':     ['bouskoura'],
+    'Bouznika':      ['bouznika'],
+    'Cabo Negro':    ['cabo negro'],
+    'Casablanca':    ['casablanca'],
+    'Chefchaouen':   ['chefchaouen', 'chaouen'],
+    'Dakhla':        ['dakhla'],
+    'Dar Bouazza':   ['dar bouazza'],
+    'Deroua':        ['deroua'],
+    'El Jadida':     ['el jadida'],
+    'Errachidia':    ['errachidia'],
+    'Essaouira':     ['essaouira'],
+    'Fès':           ['fes', 'fès', 'fez'],
+    'Fnideq':        ['fnideq'],
+    'Guelmim':       ['guelmim', 'guélmim'],
+    'Ifrane':        ['ifrane'],
+    'Inezgane':      ['inezgane'],
+    'Kénitra':       ['kenitra', 'kénitra'],
+    'Khouribga':     ['khouribga'],
+    'Laâyoune':      ['laayoune', 'laâyoune', 'el aaiun'],
+    'Larache':       ['larache'],
+    'Marrakech':     ['marrakech', 'marrakesh'],
+    'Martil':        ['martil'],
+    'Meknès':        ['meknes', 'meknès'],
+    "M'diq":         ["m'diq", 'mdiq'],
+    'Midelt':        ['midelt'],
+    'Mohammédia':    ['mohammedia', 'mohammédia'],
+    'Nador':         ['nador'],
+    'Ouarzazate':    ['ouarzazate'],
+    'Ouazzane':      ['ouazzane'],
+    'Oued Zem':      ['oued zem'],
+    'Oujda':         ['oujda'],
+    'Oulad Teima':   ['oulad teima'],
+    'Rabat':         ['rabat'],
+    'Safi':          ['safi'],
+    'Salé':          ['sale', 'salé'],
+    'Settat':        ['settat'],
+    'Sidi Kacem':    ['sidi kacem'],
+    'Sidi Slimane':  ['sidi slimane'],
+    'Skhirat':       ['skhirat'],
+    'Tanger':        ['tanger', 'tangier'],
+    'Taroudant':     ['taroudant'],
+    'Taza':          ['taza'],
+    'Témara':        ['temara', 'témara'],
+    'Tétouan':       ['tetouan', 'tétouan'],
+    'Tiznit':        ['tiznit'],
+    'Zagora':        ['zagora'],
+}
+
+# Index inversé : variante_lowercase → nom_affiché
+_VILLE_INDEX = {
+    variant: display
+    for display, variants in VILLES_MAROC.items()
+    for variant in variants
+}
+
+
+# ── Villes disponibles (filtrées — vraies villes uniquement) ─────────────────
 
 def _get_villes():
-    return (
+    """
+    Retourne uniquement les vraies villes marocaines présentes en DB,
+    dédupliquées et normalisées (Fes/Fès → Fès, Meknes/Meknès → Meknès).
+    """
+    db_cities = (
         Property.objects
         .values_list('city', flat=True)
         .distinct()
-        .order_by('city')
     )
+
+    found = set()
+    for city in db_cities:
+        if not city:
+            continue
+        key = city.strip().lower()
+        display = _VILLE_INDEX.get(key)
+        if display:
+            found.add(display)
+
+    return sorted(found)
 
 
 # ── Vue : catalogue paginé ────────────────────────────────────────────────────
@@ -44,7 +127,14 @@ def property_list(request):
     sort_by  = request.GET.get('sort',      'recent')
 
     if city:
-        qs = qs.filter(city__iexact=city)
+        # Chercher toutes les variantes de la ville sélectionnée
+        # Ex: "Fès" → filtre sur ['fes', 'fès', 'fez']
+        variants = VILLES_MAROC.get(city, [city.lower()])
+        from django.db.models import Q
+        q = Q()
+        for v in variants:
+            q |= Q(city__iexact=v)
+        qs = qs.filter(q)
     if ptype:
         qs = qs.filter(property_type=ptype)
     if p_min:
