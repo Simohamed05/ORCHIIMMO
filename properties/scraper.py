@@ -418,6 +418,12 @@ class MubawabScraper:
                                 if v and not listing.get(k):
                                     listing[k] = v
                             _delay(0.3, 0.7)
+                        # ── WhatsApp : le téléphone est chiffré côté serveur
+                        # On stocke l'URL de l'annonce Mubawab → le vendeur
+                        # est joignable via le bouton WhatsApp sur la page originale
+                        if detail_url and not listing.get('contact_whatsapp'):
+                            listing['contact_whatsapp'] = detail_url
+                            _delay(0.3, 0.7)
                         yield listing
                 if page < max_pages:
                     _delay()
@@ -496,12 +502,58 @@ class AvitoScraper:
                     if listing:
                         if city_filter and city_filter.lower() not in listing['city'].lower():
                             continue
+                        # ── Enrichissement contact depuis la page de détail ───
+                        detail_url = listing.get('url', '')
+                        if detail_url and not listing.get('contact_phone'):
+                            phone, wa_url = self._get_detail_contact(session, detail_url)
+                            if phone:
+                                listing['contact_phone'] = phone
+                                listing['contact_whatsapp'] = wa_url or f'https://wa.me/{phone}?text=Bonjour%2C+je+suis+int%C3%A9ress%C3%A9+par+votre+annonce+sur+Avito'
+                            _delay(0.4, 0.8)
                         yield listing
             except Exception as e:
                 logger.warning(f'[Avito] page {page}: {e}')
                 break
             if page < max_pages:
                 _delay()
+
+    @staticmethod
+    def _get_detail_contact(session, url: str):
+        """Visite la page de détail Avito et extrait phone + WhatsApp depuis NEXT_DATA."""
+        try:
+            r = session.get(url, timeout=20)
+            if r.status_code != 200:
+                return '', ''
+            m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', r.text, re.DOTALL)
+            if not m:
+                return '', ''
+            data = json.loads(m.group(1))
+            pp   = data.get('props', {}).get('pageProps', {}).get('componentProps', {})
+            ad   = pp.get('ad', {}) or {}
+
+            # Téléphone direct
+            phone = str(ad.get('phone') or '').strip()
+            if phone and not re.match(r'^0[5-7]\d{8}$', phone):
+                phones = _extract_phones(phone)
+                phone = phones[0] if phones else ''
+
+            # WhatsApp link dans le HTML
+            wa_url = ''
+            wa_matches = re.findall(r'https?://(?:wa\.me|api\.whatsapp\.com/send)[^\s"<>]+', r.text)
+            for wa in wa_matches:
+                if 'phone=' in wa or 'wa.me/+' in wa or re.search(r'wa\.me/\d', wa):
+                    wa_url = wa
+                    break
+
+            # Si pas de WA link mais téléphone trouvé → construire
+            if phone and not wa_url:
+                wa_phone = phone.replace('0', '+2120', 1) if phone.startswith('0') else phone
+                wa_url = f'https://wa.me/{wa_phone}?text=Bonjour%2C+je+suis+int%C3%A9ress%C3%A9+par+votre+annonce+Avito'
+
+            return phone, wa_url
+        except Exception as e:
+            logger.debug(f'[Avito] detail contact error: {e}')
+            return '', ''
 
     @staticmethod
     def _extract_ads(html: str) -> list:

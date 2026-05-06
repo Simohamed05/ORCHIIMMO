@@ -373,10 +373,10 @@
                   {% if prop.scraped_at %}{{ prop.scraped_at|date:"d M Y" }}{% endif %}
                 </small>
                 <div class="d-flex align-items-center gap-2">
-                  {% if prop.contact_whatsapp or prop.contact_phone %}
-                  <a href="{% if prop.contact_whatsapp %}{{ prop.contact_whatsapp }}{% else %}https://wa.me/{{ prop.contact_phone|cut:' '|cut:'-' }}{% endif %}"
+                  {% if prop.contact_whatsapp or prop.contact_phone or prop.url %}
+                  <a href="{% if prop.contact_whatsapp %}{{ prop.contact_whatsapp }}{% elif prop.contact_phone %}https://wa.me/{{ prop.contact_phone|cut:' '|cut:'-' }}{% else %}{{ prop.url }}{% endif %}"
                      target="_blank" rel="noopener"
-                     title="Contacter sur WhatsApp"
+                     title="{% if prop.contact_whatsapp and 'wa.me' in prop.contact_whatsapp %}Contacter sur WhatsApp{% elif prop.contact_phone %}Contacter sur WhatsApp{% else %}Contacter via {{ prop.source|title }}{% endif %}"
                      onclick="event.stopPropagation();"
                      class="btn btn-sm d-flex align-items-center justify-content-center"
                      style="background:#25D366;color:#fff;width:30px;height:30px;border-radius:50%;padding:0;border:none;flex-shrink:0;">

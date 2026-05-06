@@ -290,14 +290,27 @@
         {% endif %}
 
         {% if prop.contact_whatsapp %}
-        <a href="{{ prop.contact_whatsapp }}"
-           target="_blank" rel="noopener"
-           class="btn w-100 mb-2 fw-bold"
-           style="background:#25D366;color:#fff;border:none;">
-          <i class="bi bi-whatsapp me-2"></i>
-          <span data-lang-fr>Contacter sur WhatsApp</span>
-          <span data-lang-ar>التواصل عبر واتساب</span>
-        </a>
+          {% if 'wa.me' in prop.contact_whatsapp or 'whatsapp.com' in prop.contact_whatsapp %}
+          {# Lien WhatsApp direct (Agenz, Avito) #}
+          <a href="{{ prop.contact_whatsapp }}"
+             target="_blank" rel="noopener"
+             class="btn w-100 mb-2 fw-bold"
+             style="background:#25D366;color:#fff;border:none;">
+            <i class="bi bi-whatsapp me-2"></i>
+            <span data-lang-fr>Contacter sur WhatsApp</span>
+            <span data-lang-ar>التواصل عبر واتساب</span>
+          </a>
+          {% else %}
+          {# URL annonce source (Mubawab) — WhatsApp accessible sur le site #}
+          <a href="{{ prop.contact_whatsapp }}"
+             target="_blank" rel="noopener"
+             class="btn w-100 mb-2 fw-bold"
+             style="background:#25D366;color:#fff;border:none;">
+            <i class="bi bi-whatsapp me-2"></i>
+            <span data-lang-fr>WhatsApp via {{ prop.source|title }}</span>
+            <span data-lang-ar>واتساب عبر {{ prop.source|title }}</span>
+          </a>
+          {% endif %}
         {% elif prop.contact_phone %}
         <a href="https://wa.me/{{ prop.contact_phone|cut:' '|cut:'-' }}"
            target="_blank" rel="noopener"
