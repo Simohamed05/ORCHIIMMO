@@ -14,13 +14,11 @@ from django.apps import AppConfig
 logger = logging.getLogger(__name__)
 
 SCRAPE_INTERVAL_HOURS = 6
-SCRAPE_PAGES          = 3
+SCRAPE_PAGES          = 1   # Réduit à 1 page pour limiter la RAM (512 MB Render free)
 SCRAPE_SOURCES        = [
-    'mubawab', 'avito', 'sarouty',
-    'agenz', 'marocannonces', 'masaken',
-    'logicimmo', 'bikhir',
+    'mubawab', 'agenz', 'masaken',   # 3 sources légères seulement en auto-scrape
 ]
-INITIAL_DELAY_SECONDS = 45
+INITIAL_DELAY_SECONDS = 120  # Attendre 2 min après démarrage (app stable en mémoire)
 
 
 class PropertiesConfig(AppConfig):
