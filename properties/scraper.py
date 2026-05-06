@@ -15,6 +15,7 @@ import time
 import random
 import json
 import logging
+import base64
 from datetime import date
 from django.utils import timezone
 from typing import Iterator, Optional
@@ -23,6 +24,73 @@ import requests
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 import warnings
 warnings.filterwarnings('ignore', category=XMLParsedAsHTMLWarning)
+
+# ── Décryptage AES Mubawab ─────────────────────────────────────────────────────
+try:
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from cryptography.hazmat.backends import default_backend
+    _HAS_CRYPTO = True
+except ImportError:
+    try:
+        from Crypto.Cipher import AES as _AES
+        _HAS_CRYPTO = True
+        _USE_PYCRYPTO = True
+    except ImportError:
+        _HAS_CRYPTO = False
+
+# Clé AES Mubawab extraite de fed() dans property.js
+# cvkwer(["61","44","6c","76","4e","33","4a","31","4e","44","6c","30",
+#         "4e","44","42","30","64","54","52","70","63","41","3d","3d"])
+# = "aDlvN3J1NDl0NDB0dTRpcA=="
+_MUBAWAB_AES_KEY = base64.b64decode('aDlvN3J1NDl0NDB0dTRpcA==')
+
+
+def _mubawab_decrypt_phone(encrypted_b64: str) -> str:
+    """
+    Décrypte le numéro de téléphone Mubawab.
+    Algorithme : AES-128-ECB + PKCS7 (trouvé dans property.js : CryptoJS.AES.decrypt)
+    Clé        : base64.decode('aDlvN3J1NDl0NDB0dTRpcA==')
+    Entrée     : valeur du champ kdlkfusjd (base64)
+    """
+    if not encrypted_b64 or not _HAS_CRYPTO:
+        return ''
+    try:
+        ciphertext = base64.b64decode(encrypted_b64)
+        if len(ciphertext) % 16 != 0:
+            return ''
+
+        try:
+            # cryptography library
+            cipher = Cipher(algorithms.AES(_MUBAWAB_AES_KEY), modes.ECB(),
+                            backend=default_backend())
+            decryptor = cipher.decryptor()
+            raw = decryptor.update(ciphertext) + decryptor.finalize()
+        except NameError:
+            # pycryptodome fallback
+            cipher = _AES.new(_MUBAWAB_AES_KEY, _AES.MODE_ECB)
+            raw = cipher.decrypt(ciphertext)
+
+        # PKCS7 unpad
+        pad_len = raw[-1]
+        if 1 <= pad_len <= 16:
+            raw = raw[:-pad_len]
+
+        phone = raw.decode('utf-8').strip()
+        # Normaliser vers format 0XXXXXXXXX marocain
+        phone = re.sub(r'[\s.\-]', '', phone)
+        if phone.startswith('+212'):
+            phone = '0' + phone[4:]
+        elif phone.startswith('00212'):
+            phone = '0' + phone[5:]
+        elif phone.startswith('212') and len(phone) >= 11:
+            phone = '0' + phone[3:]
+        elif not phone.startswith('0') and len(phone) == 9:
+            phone = '0' + phone  # ajouter le 0 manquant
+
+        return phone if re.match(r'^0[5-7]\d{8}$', phone) else phone
+    except Exception as e:
+        logger.debug(f'[Mubawab] decrypt error: {e}')
+        return ''
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +323,11 @@ def _fetch_detail_contact(session, url: str) -> dict:
         soup = BeautifulSoup(html, 'lxml')
         full_text = soup.get_text(' ')
 
+        # ── 0. MUBAWAB — kdlkfusjd fixe (plateforme) pour non-connectés ────────
+        # Le champ kdlkfusjd est identique pour TOUTES les annonces quand on n'est
+        # pas connecté → contient le numéro de la plateforme, pas du vendeur.
+        # Solution : URL originale comme lien WhatsApp (icône visible, contact via Mubawab)
+
         # ── 1. Liens WhatsApp (phone= dans l'URL) ────────────────────────────
         wa_links = soup.find_all('a', href=re.compile(r'wa\.me|whatsapp\.com/send', re.I))
         for wa in wa_links:
@@ -418,9 +491,7 @@ class MubawabScraper:
                                 if v and not listing.get(k):
                                     listing[k] = v
                             _delay(0.3, 0.7)
-                        # ── WhatsApp : le téléphone est chiffré côté serveur
-                        # On stocke l'URL de l'annonce Mubawab → le vendeur
-                        # est joignable via le bouton WhatsApp sur la page originale
+                        # ── Si décryptage a échoué → fallback URL originale
                         if detail_url and not listing.get('contact_whatsapp'):
                             listing['contact_whatsapp'] = detail_url
                             _delay(0.3, 0.7)
@@ -519,36 +590,40 @@ class AvitoScraper:
 
     @staticmethod
     def _get_detail_contact(session, url: str):
-        """Visite la page de détail Avito et extrait phone + WhatsApp depuis NEXT_DATA."""
+        """
+        Visite la page de détail Avito et extrait le téléphone depuis NEXT_DATA.
+        Le téléphone est dans : props.pageProps.componentProps.ad.phone
+        (confirmé sur plusieurs annonces : 'isPhoneHidden': false, 'phone': '06XXXXXXXX')
+        """
         try:
             r = session.get(url, timeout=20)
             if r.status_code != 200:
                 return '', ''
-            m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', r.text, re.DOTALL)
-            if not m:
-                return '', ''
-            data = json.loads(m.group(1))
-            pp   = data.get('props', {}).get('pageProps', {}).get('componentProps', {})
-            ad   = pp.get('ad', {}) or {}
+            raw = r.text
 
-            # Téléphone direct
-            phone = str(ad.get('phone') or '').strip()
-            if phone and not re.match(r'^0[5-7]\d{8}$', phone):
-                phones = _extract_phones(phone)
-                phone = phones[0] if phones else ''
+            # Chercher directement dans le JSON brut (plus fiable que navigation)
+            phone = ''
+            # Pattern exact : "isPhoneHidden":false,"phone":"06XXXXXXXX"
+            m_phone = re.search(
+                r'"isPhoneHidden"\s*:\s*false\s*,\s*"phone"\s*:\s*"([^"]+)"',
+                raw
+            )
+            if m_phone:
+                phone = m_phone.group(1).strip()
+            else:
+                # Fallback : chercher "phone":"0XXXXXXXXX" dans tout le JSON
+                m_phone2 = re.search(r'"phone"\s*:\s*"(0[5-7]\d{8})"', raw)
+                if m_phone2:
+                    phone = m_phone2.group(1).strip()
 
-            # WhatsApp link dans le HTML
+            # Construire le lien WhatsApp
             wa_url = ''
-            wa_matches = re.findall(r'https?://(?:wa\.me|api\.whatsapp\.com/send)[^\s"<>]+', r.text)
-            for wa in wa_matches:
-                if 'phone=' in wa or 'wa.me/+' in wa or re.search(r'wa\.me/\d', wa):
-                    wa_url = wa
-                    break
-
-            # Si pas de WA link mais téléphone trouvé → construire
-            if phone and not wa_url:
-                wa_phone = phone.replace('0', '+2120', 1) if phone.startswith('0') else phone
-                wa_url = f'https://wa.me/{wa_phone}?text=Bonjour%2C+je+suis+int%C3%A9ress%C3%A9+par+votre+annonce+Avito'
+            if phone:
+                wa_phone = '+212' + phone[1:] if phone.startswith('0') else phone
+                wa_url = (
+                    f'https://wa.me/{wa_phone}'
+                    f'?text=Bonjour%2C+je+suis+int%C3%A9ress%C3%A9+par+votre+annonce+Avito'
+                )
 
             return phone, wa_url
         except Exception as e:
