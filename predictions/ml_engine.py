@@ -1,31 +1,33 @@
 """
 Orchiimmo — Moteur ML de prédiction de prix immobilier
-Scope  : Appartements au Maroc | Prix en MAD
-Modèle : Entraîné from scratch via ml/train.py
+Scope  : Tous types de biens au Maroc | Prix en MAD
+Modèle : Entraîné depuis la DB Django via ml/train_from_db.py
 """
+import logging
 import joblib
 import numpy as np
 import pandas as pd
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 
 class OrchiimmoMLEngine:
     """
     Singleton — charge best_model.pkl une seule fois.
-    Prédit le prix en MAD avec les features exactes du training.
+    Calcule les stats ville/quartier directement depuis la DB Django.
+    Respecte l'ordre EXACT des features du modèle entraîné.
     """
     _instance = None
 
-    def __init__(self, model_path: Path, data_path: Path):
+    def __init__(self, model_path: Path, data_path: Path = None):
         bundle = joblib.load(model_path)
-        self.model         = bundle['pipeline']           # modèle sklearn
-        self.encoders      = bundle['encoders']           # dict LabelEncoders
-        self.metadata      = bundle['metadata']           # version, R², MAE…
+        self.model         = bundle['pipeline']
+        self.encoders      = bundle['encoders']
+        self.metadata      = bundle['metadata']
         self.known_cities  = bundle.get('known_cities', [])
-        self.features      = bundle['metadata'].get('features', [])  # liste ordonnée
-        self.data_path     = data_path
-        self._df_cache     = None
-        # Pré-calculer les stats par ville/quartier depuis le dataset
+        self.features      = bundle['metadata'].get('features', [])
+        # Stats pré-calculées depuis la DB (chargées à la première prédiction)
         self._city_stats   = None
         self._dist_stats   = None
 
@@ -33,21 +35,16 @@ class OrchiimmoMLEngine:
     def get_instance(cls):
         if cls._instance is None:
             from django.conf import settings
-            cls._instance = cls(
-                model_path=settings.ML_MODEL_PATH,
-                data_path=settings.ML_DATA_PATH,
-            )
+            cls._instance = cls(model_path=settings.ML_MODEL_PATH)
         return cls._instance
 
     @classmethod
     def reset_instance(cls):
-        """Force le rechargement du modèle (utile après re-training)."""
         cls._instance = None
 
     # ── Encodage ─────────────────────────────────────────────────────────────
 
     def _encode(self, col: str, value: str) -> int:
-        """Encode une valeur avec le LabelEncoder correspondant. Retourne 0 si inconnue."""
         enc = self.encoders.get(col)
         if enc is None:
             return 0
@@ -56,72 +53,75 @@ class OrchiimmoMLEngine:
         except Exception:
             return 0
 
-    # ── Stats géographiques (cache) ───────────────────────────────────────────
+    # ── Stats géographiques depuis la DB ─────────────────────────────────────
 
-    def _get_df(self) -> pd.DataFrame:
-        if self._df_cache is None:
-            try:
-                self._df_cache = pd.read_csv(self.data_path)
-            except Exception:
-                self._df_cache = pd.DataFrame()
-        return self._df_cache
+    def _load_stats_from_db(self):
+        """Calcule les statistiques ville/quartier depuis Property model."""
+        try:
+            from properties.models import Property
+            qs = Property.objects.filter(
+                price_mad__gte=100_000,
+                price_mad__lte=50_000_000,
+                area_m2__gte=10,
+                price_per_m2_mad__isnull=False,
+            ).values('city', 'district', 'price_mad', 'price_per_m2_mad', 'area_m2')
 
-    def _get_city_stats(self) -> pd.DataFrame:
-        """Retourne un DataFrame avec les stats (médiane) par ville."""
-        if self._city_stats is None:
-            df = self._get_df()
+            df = pd.DataFrame(list(qs))
             if df.empty:
-                self._city_stats = pd.DataFrame()
-            else:
-                stat_cols = ['city_price_median', 'city_ppm2_median',
-                             'city_area_median', 'city_count']
-                existing  = [c for c in stat_cols if c in df.columns]
-                if 'city' in df.columns and existing:
-                    self._city_stats = (
-                        df.groupby('city')[existing].median().reset_index()
-                    )
-                else:
-                    self._city_stats = pd.DataFrame()
-        return self._city_stats
+                return pd.DataFrame(), pd.DataFrame()
 
-    def _get_dist_stats(self) -> pd.DataFrame:
-        """Retourne un DataFrame avec les stats (médiane) par quartier."""
-        if self._dist_stats is None:
-            df = self._get_df()
-            if df.empty or 'district' not in df.columns:
-                self._dist_stats = pd.DataFrame()
-            elif 'district_ppm2_median' in df.columns:
-                self._dist_stats = (
-                    df.groupby('district')['district_ppm2_median']
-                    .median().reset_index()
-                )
-            else:
-                self._dist_stats = pd.DataFrame()
-        return self._dist_stats
+            df['city']     = df['city'].fillna('').str.strip().str.lower()
+            df['district'] = df['district'].fillna('').str.strip().str.lower()
 
-    def _lookup_city_stat(self, city: str, col: str, fallback=None):
-        """Recherche la valeur d'une stat pour une ville donnée."""
-        cs = self._get_city_stats()
-        if cs.empty or col not in cs.columns:
+            # Stats par ville
+            city_stats = df.groupby('city').agg(
+                city_ppm2_median  = ('price_per_m2_mad', 'median'),
+                city_price_median = ('price_mad', 'median'),
+                city_area_median  = ('area_m2', 'median'),
+                city_count        = ('price_mad', 'count'),
+            ).reset_index()
+
+            # Stats par quartier (non-vide seulement)
+            df_d = df[df['district'] != '']
+            if not df_d.empty:
+                dist_stats = df_d.groupby(['city', 'district']).agg(
+                    district_ppm2_median = ('price_per_m2_mad', 'median'),
+                ).reset_index()
+            else:
+                dist_stats = pd.DataFrame(
+                    columns=['city', 'district', 'district_ppm2_median'])
+
+            return city_stats, dist_stats
+
+        except Exception as e:
+            logger.warning(f'[ML] Impossible de charger les stats DB: {e}')
+            return pd.DataFrame(), pd.DataFrame()
+
+    def _ensure_stats(self):
+        if self._city_stats is None:
+            self._city_stats, self._dist_stats = self._load_stats_from_db()
+
+    def _lookup_city(self, city: str, col: str, fallback: float) -> float:
+        self._ensure_stats()
+        cs = self._city_stats
+        if cs is None or cs.empty or col not in cs.columns:
             return fallback
         row = cs[cs['city'] == city.lower().strip()]
-        if row.empty:
-            # Essayer sans normalisation
-            row = cs[cs['city'] == city]
         if row.empty:
             return fallback
         val = row.iloc[0][col]
         return float(val) if not pd.isna(val) else fallback
 
-    def _lookup_dist_stat(self, district: str, fallback=None):
-        """Recherche district_ppm2_median pour un quartier donné."""
-        ds = self._get_dist_stats()
-        if ds.empty or 'district_ppm2_median' not in ds.columns:
+    def _lookup_district(self, city: str, district: str, fallback: float) -> float:
+        self._ensure_stats()
+        ds = self._dist_stats
+        if ds is None or ds.empty:
             return fallback
-        row = ds[ds['district'] == district.lower().strip()]
+        row = ds[(ds['city'] == city.lower().strip()) &
+                 (ds['district'] == district.lower().strip())]
         if row.empty:
             return fallback
-        val = row.iloc[0]['district_ppm2_median']
+        val = row.iloc[0].get('district_ppm2_median', np.nan)
         return float(val) if not pd.isna(val) else fallback
 
     # ── Prédiction ────────────────────────────────────────────────────────────
@@ -130,56 +130,62 @@ class OrchiimmoMLEngine:
                 bathrooms: int, property_type: str = 'apartment',
                 district: str = '') -> dict:
         """
-        Prédit le prix MAD d'un appartement marocain.
-        Construit exactement les mêmes features que ml/train.py.
+        Prédit le prix MAD. Respecte l'ordre EXACT des features du modèle v2.0:
+        city_enc, district_enc, property_type_enc, area_m2, bedrooms, bathrooms,
+        city_ppm2_median, city_price_median, city_area_median,
+        district_ppm2_median, city_count, ratio_surface_chambres, price_per_m2_city
         """
         city_low = city.strip().lower()
         dist_low = district.strip().lower() if district else ''
         type_low = property_type.strip().lower()
 
-        # ── Valeurs par défaut (médiane globale du dataset) ──────────────────
-        df = self._get_df()
-        global_city_price   = float(df['city_price_median'].median())  if not df.empty and 'city_price_median'  in df.columns else 1_285_000.0
-        global_city_ppm2    = float(df['city_ppm2_median'].median())   if not df.empty and 'city_ppm2_median'   in df.columns else 12_153.0
-        global_city_area    = float(df['city_area_median'].median())   if not df.empty and 'city_area_median'   in df.columns else 89.0
-        global_dist_ppm2    = float(df['district_ppm2_median'].median()) if not df.empty and 'district_ppm2_median' in df.columns else 12_144.0
-        global_city_count   = float(df['city_count'].median())         if not df.empty and 'city_count'         in df.columns else 352.0
+        # ── Valeurs globales de fallback ──────────────────────────────────────
+        self._ensure_stats()
+        cs = self._city_stats
+        global_ppm2  = float(cs['city_ppm2_median'].median())  if cs is not None and not cs.empty else 12_000.0
+        global_price = float(cs['city_price_median'].median()) if cs is not None and not cs.empty else 1_400_000.0
+        global_area  = float(cs['city_area_median'].median())  if cs is not None and not cs.empty else 90.0
+        global_count = float(cs['city_count'].median())        if cs is not None and not cs.empty else 100.0
 
         # ── Lookup stats ville ────────────────────────────────────────────────
-        city_price_median    = self._lookup_city_stat(city_low, 'city_price_median',    global_city_price)
-        city_ppm2_median     = self._lookup_city_stat(city_low, 'city_ppm2_median',     global_city_ppm2)
-        city_area_median     = self._lookup_city_stat(city_low, 'city_area_median',     global_city_area)
-        city_count           = self._lookup_city_stat(city_low, 'city_count',           global_city_count)
+        city_ppm2_median  = self._lookup_city(city_low, 'city_ppm2_median',  global_ppm2)
+        city_price_median = self._lookup_city(city_low, 'city_price_median', global_price)
+        city_area_median  = self._lookup_city(city_low, 'city_area_median',  global_area)
+        city_count        = self._lookup_city(city_low, 'city_count',        global_count)
 
         # ── Lookup stats quartier ─────────────────────────────────────────────
         district_ppm2_median = (
-            self._lookup_dist_stat(dist_low, None)
+            self._lookup_district(city_low, dist_low, None)
             if dist_low else None
         )
         if district_ppm2_median is None:
-            district_ppm2_median = city_ppm2_median  # fallback = ville
+            district_ppm2_median = city_ppm2_median
 
         # ── Features dérivées ─────────────────────────────────────────────────
-        bedrooms_safe          = max(1, bedrooms)
+        bedrooms_safe          = max(1, bedrooms or 1)
         ratio_surface_chambres = area_m2 / bedrooms_safe
-        price_per_m2_city      = city_price_median / max(1, city_area_median)
+        price_per_m2_city      = city_price_median / max(1.0, city_area_median)
 
-        # ── Vecteur de features (ordre exact = training) ──────────────────────
+        # ── Vecteur de features — ORDRE EXACT du modèle v2.0 ─────────────────
         feat = pd.DataFrame([{
-            'city_enc':             self._encode('city',          city_low),
-            'district_enc':         self._encode('district',      dist_low),
-            'property_type_enc':    self._encode('property_type', type_low),
-            'area_m2':              float(area_m2),
-            'bedrooms':             int(bedrooms),
-            'bathrooms':            int(bathrooms),
-            'city_price_median':    city_price_median,
-            'city_ppm2_median':     city_ppm2_median,
-            'city_area_median':     city_area_median,
-            'district_ppm2_median': district_ppm2_median,
-            'city_count':           city_count,
-            'ratio_surface_chambres': ratio_surface_chambres,
-            'price_per_m2_city':    price_per_m2_city,
+            'city_enc':               self._encode('city',          city_low),
+            'district_enc':           self._encode('district',      dist_low),
+            'property_type_enc':      self._encode('property_type', type_low),
+            'area_m2':                float(area_m2),
+            'bedrooms':               int(bedrooms or 0),
+            'bathrooms':              int(bathrooms or 0),
+            'city_ppm2_median':       city_ppm2_median,       # pos 6 ✅
+            'city_price_median':      city_price_median,      # pos 7 ✅
+            'city_area_median':       city_area_median,       # pos 8 ✅
+            'district_ppm2_median':   district_ppm2_median,   # pos 9 ✅
+            'city_count':             city_count,             # pos 10 ✅
+            'ratio_surface_chambres': ratio_surface_chambres, # pos 11 ✅
+            'price_per_m2_city':      price_per_m2_city,      # pos 12 ✅
         }])
+
+        # Garantir l'ordre exact des colonnes
+        if self.features:
+            feat = feat[self.features]
 
         # ── Prédiction en log-space ────────────────────────────────────────────
         log_pred  = self.model.predict(feat)[0]
@@ -213,65 +219,58 @@ class OrchiimmoMLEngine:
             'comparables':     comparables,
         }
 
-    # ── Comparables ───────────────────────────────────────────────────────────
+    # ── Comparables depuis la DB ──────────────────────────────────────────────
 
     def _find_comparables(self, city: str, property_type: str,
                           area_m2: float, n: int = 5) -> list:
-        df = self._get_df()
-        if df.empty:
-            return []
         try:
-            # Colonnes prix acceptées
-            price_col = next(
-                (c for c in ('price_mad', 'price_local', 'price_eur') if c in df.columns),
-                None
-            )
-            if price_col is None:
-                return []
+            from properties.models import Property
+            qs = Property.objects.filter(
+                city__iexact=city,
+                area_m2__gte=area_m2 * 0.70,
+                area_m2__lte=area_m2 * 1.30,
+                price_mad__gt=0,
+            ).order_by('price_mad')[:n]
 
-            city_col = city.strip().lower()
-            mask = (
-                (df['city'].str.lower().str.strip() == city_col) &
-                (df['area_m2'].between(area_m2 * 0.70, area_m2 * 1.30)) &
-                (df[price_col].notna())
-            )
-            comps = df[mask].nsmallest(n, price_col)
-            result = []
-            for _, row in comps.iterrows():
-                result.append({
-                    'city':      row.get('city', ''),
-                    'district':  row.get('district', ''),
-                    'area_m2':   row.get('area_m2', ''),
-                    'bedrooms':  row.get('bedrooms', ''),
-                    'price_mad': row.get(price_col, 0),
-                    'latitude':  row.get('latitude', None),
-                    'longitude': row.get('longitude', None),
-                    'url':       row.get('url', ''),
-                })
-            return result
+            return [{
+                'city':      p.city,
+                'district':  p.district,
+                'area_m2':   p.area_m2,
+                'bedrooms':  p.bedrooms,
+                'price_mad': p.price_mad,
+                'latitude':  p.latitude,
+                'longitude': p.longitude,
+                'url':       p.url,
+            } for p in qs]
         except Exception:
             return []
 
     # ── Helpers publics ───────────────────────────────────────────────────────
 
     def get_cities(self) -> list:
-        """Liste triée des villes disponibles (noms valides uniquement)."""
+        """Liste triée des villes disponibles depuis la DB."""
         import re
-        df = self._get_df()
-        if not df.empty and 'city' in df.columns:
-            cities = df['city'].dropna().unique().tolist()
-            # Exclure les valeurs numériques / codes invalides
+        try:
+            from properties.models import Property
+            cities = (Property.objects
+                      .values_list('city', flat=True)
+                      .distinct()
+                      .order_by('city'))
             valid = sorted([
                 c for c in cities
                 if c and len(re.sub(r'[^a-zA-ZÀ-ÿ\s\-]', '', str(c)).strip()) >= 2
+                and c.lower() not in ('maroc', 'location immobilier', '')
             ])
-            return [c.title() for c in valid]
-        return list(self.known_cities)
+            return valid
+        except Exception:
+            return [c.title() for c in self.known_cities]
 
     def get_districts(self, city: str = '') -> list:
-        df = self._get_df()
-        if df.empty or 'district' not in df.columns:
+        try:
+            from properties.models import Property
+            qs = Property.objects.values_list('district', flat=True).distinct()
+            if city:
+                qs = qs.filter(city__iexact=city)
+            return sorted([d for d in qs if d and len(d) > 1])
+        except Exception:
             return []
-        sub = df[df['city'].str.lower() == city.lower()] if city else df
-        districts = sorted(sub['district'].dropna().unique().tolist())
-        return [d.title() for d in districts if d and len(d) > 1]
