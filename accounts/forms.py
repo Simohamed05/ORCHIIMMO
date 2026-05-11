@@ -26,21 +26,30 @@ class RegisterForm(UserCreationForm):
         self.fields['password2'].widget.attrs.update({'class': 'form-control', 'id': 'id_password2'})
 
     def clean_password2(self):
-        pwd = self.cleaned_data.get('password2', '')
+        password1 = self.cleaned_data.get('password1')
+        password2 = self.cleaned_data.get('password2')
+
         errors = []
-        if len(pwd) < 8:
-            errors.append("Au moins 8 caractères.")
-        if not re.search(r'[A-Z]', pwd):
-            errors.append("Au moins 1 lettre majuscule (A-Z).")
-        if not re.search(r'[a-z]', pwd):
-            errors.append("Au moins 1 lettre minuscule (a-z).")
-        if not re.search(r'\d', pwd):
-            errors.append("Au moins 1 chiffre (0-9).")
-        if not re.search(r'[!@#$%^&*()\-_=+\[\]{};:\'",.<>?/\\|`~]', pwd):
-            errors.append("Au moins 1 caractère spécial (!@#$%...).")
+
+        if password1 and password2 and password1 != password2:
+            errors.append("Les deux mots de passe ne correspondent pas.")
+
+        if password2:
+            if len(password2) < 8:
+                errors.append("Au moins 8 caractères.")
+            if not re.search(r'[A-Z]', password2):
+                errors.append("Au moins 1 lettre majuscule (A-Z).")
+            if not re.search(r'[a-z]', password2):
+                errors.append("Au moins 1 lettre minuscule (a-z).")
+            if not re.search(r'\d', password2):
+                errors.append("Au moins 1 chiffre (0-9).")
+            if not re.search(r'[!@#$%^&*()\-_=+\[\]{};:\'",.<>?/\\|`~]', password2):
+                errors.append("Au moins 1 caractère spécial (!@#$%...).")
+
         if errors:
             raise ValidationError(errors)
-        return super().clean_password2()
+
+        return password2
 
 class ProfileForm(forms.ModelForm):
     class Meta:
