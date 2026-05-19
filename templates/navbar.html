@@ -33,14 +33,6 @@
             <span data-lang-ar>الفهرس</span>
           </a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link {% if 'dashboards' in request.resolver_match.app_name %}active{% endif %}"
-             href="{% url 'dashboards:index' %}">
-            <i class="bi bi-bar-chart-fill me-1"></i>
-            <span data-lang-fr>Dashboards</span>
-            <span data-lang-ar>لوحات البيانات</span>
-          </a>
-        </li>
         {% if user.is_authenticated %}
         <li class="nav-item">
           <a class="nav-link {% if 'predictions' in request.resolver_match.app_name %}active{% endif %}"
@@ -51,6 +43,14 @@
           </a>
         </li>
         {% endif %}
+        <li class="nav-item">
+          <a class="nav-link {% if 'dashboards' in request.resolver_match.app_name %}active{% endif %}"
+             href="{% url 'dashboards:index' %}">
+            <i class="bi bi-bar-chart-fill me-1"></i>
+            <span data-lang-fr>Dashboards</span>
+            <span data-lang-ar>لوحات البيانات</span>
+          </a>
+        </li>
       </ul>
 
       <!-- Droite : auth -->
