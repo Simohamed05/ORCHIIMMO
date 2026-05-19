@@ -138,8 +138,8 @@
           </p>
         {% endif %}
 
-        <!-- Lien source -->
-        {% if prop.url %}
+        <!-- Lien source (admin uniquement) -->
+        {% if prop.url and user.is_staff %}
         <div class="mt-3">
           <a href="{{ prop.url }}" target="_blank" rel="noopener"
              class="btn btn-outline-primary">
@@ -238,134 +238,166 @@
     {% endif %}
 
     <!-- ── CONTACT VENDEUR / AGENCE ────────────────────────────────────── -->
-    {% if prop.contact_phone or prop.contact_agency or prop.contact_name or prop.contact_email %}
+    {% if user.is_staff %}
+      {% if prop.contact_phone or prop.contact_agency or prop.contact_name or prop.contact_email %}
+      <div class="card mb-4 border-success">
+        <div class="card-header" style="background:linear-gradient(135deg,#06D6A0,#059669);color:#fff;">
+          <h6 class="mb-0">
+            <i class="bi bi-person-lines-fill me-2"></i>
+            <span data-lang-fr>Contact du Vendeur</span>
+            <span data-lang-ar>بيانات البائع</span>
+          </h6>
+        </div>
+        <div class="card-body p-3">
+
+          {% if prop.contact_agency %}
+          <div class="d-flex align-items-center mb-3 p-2 rounded" style="background:rgba(6,214,160,0.08);">
+            <i class="bi bi-building me-3 fs-4 text-success"></i>
+            <div>
+              <div class="text-muted small">
+                <span data-lang-fr>Agence / Promoteur</span>
+                <span data-lang-ar>الوكالة / المطور</span>
+              </div>
+              <div class="fw-bold text-white">{{ prop.contact_agency }}</div>
+            </div>
+          </div>
+          {% elif prop.contact_name %}
+          <div class="d-flex align-items-center mb-3 p-2 rounded" style="background:rgba(6,214,160,0.08);">
+            <i class="bi bi-person-circle me-3 fs-4 text-success"></i>
+            <div>
+              <div class="text-muted small">
+                <span data-lang-fr>Annonceur</span>
+                <span data-lang-ar>المُعلن</span>
+              </div>
+              <div class="fw-bold text-white">{{ prop.contact_name }}</div>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if prop.contact_phone %}
+          <a href="tel:{{ prop.contact_phone }}"
+             class="btn btn-success w-100 mb-2 fw-bold">
+            <i class="bi bi-telephone-fill me-2"></i>
+            {{ prop.contact_phone }}
+          </a>
+          {% endif %}
+
+          {% if prop.contact_phone2 %}
+          <a href="tel:{{ prop.contact_phone2 }}"
+             class="btn btn-outline-success w-100 mb-2">
+            <i class="bi bi-telephone me-2"></i>
+            {{ prop.contact_phone2 }}
+          </a>
+          {% endif %}
+
+          {% if prop.contact_whatsapp %}
+            {% if 'wa.me' in prop.contact_whatsapp or 'whatsapp.com' in prop.contact_whatsapp %}
+            <a href="{{ prop.contact_whatsapp }}"
+               target="_blank" rel="noopener"
+               class="btn w-100 mb-2 fw-bold"
+               style="background:#25D366;color:#fff;border:none;">
+              <i class="bi bi-whatsapp me-2"></i>
+              <span data-lang-fr>Contacter sur WhatsApp</span>
+              <span data-lang-ar>التواصل عبر واتساب</span>
+            </a>
+            {% else %}
+            <a href="{{ prop.contact_whatsapp }}"
+               target="_blank" rel="noopener"
+               class="btn w-100 mb-2 fw-bold"
+               style="background:#25D366;color:#fff;border:none;">
+              <i class="bi bi-whatsapp me-2"></i>
+              <span data-lang-fr>WhatsApp via {{ prop.source|title }}</span>
+              <span data-lang-ar>واتساب عبر {{ prop.source|title }}</span>
+            </a>
+            {% endif %}
+          {% elif prop.contact_phone %}
+          <a href="https://wa.me/{{ prop.contact_phone|cut:' '|cut:'-' }}"
+             target="_blank" rel="noopener"
+             class="btn w-100 mb-2"
+             style="background:#25D366;color:#fff;border:none;">
+            <i class="bi bi-whatsapp me-2"></i>
+            WhatsApp
+          </a>
+          {% endif %}
+
+          {% if prop.contact_email %}
+          <a href="mailto:{{ prop.contact_email }}"
+             class="btn btn-outline-info w-100 mb-2">
+            <i class="bi bi-envelope me-2"></i>
+            {{ prop.contact_email }}
+          </a>
+          {% endif %}
+
+          {% if prop.contact_type %}
+          <div class="text-center mt-2">
+            <span class="badge {% if prop.contact_type == 'agence' %}bg-info{% elif prop.contact_type == 'particulier' %}bg-secondary{% else %}bg-dark{% endif %}">
+              {% if prop.contact_type == 'agence' %}
+                <i class="bi bi-building me-1"></i>
+                <span data-lang-fr>Agence immobilière</span>
+                <span data-lang-ar>وكالة عقارية</span>
+              {% elif prop.contact_type == 'particulier' %}
+                <i class="bi bi-person me-1"></i>
+                <span data-lang-fr>Particulier</span>
+                <span data-lang-ar>خاص</span>
+              {% else %}
+                {{ prop.contact_type }}
+              {% endif %}
+            </span>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+      {% else %}
+      <!-- Admin : pas de contact en DB → lien source -->
+      <div class="card mb-4">
+        <div class="card-body text-center p-3">
+          <i class="bi bi-person-lines-fill fs-3 text-muted mb-2 d-block"></i>
+          <p class="text-muted small mb-3">
+            <span data-lang-fr>Contact disponible sur le site source</span>
+            <span data-lang-ar>التواصل متاح على الموقع الأصلي</span>
+          </p>
+          {% if prop.url %}
+          <a href="{{ prop.url }}" target="_blank" rel="noopener"
+             class="btn btn-primary w-100">
+            <i class="bi bi-box-arrow-up-right me-2"></i>
+            <span data-lang-fr>Voir le contact</span>
+            <span data-lang-ar>عرض جهة الاتصال</span>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    {% else %}
+    <!-- Utilisateur non-admin : contact Orchid Island -->
     <div class="card mb-4 border-success">
       <div class="card-header" style="background:linear-gradient(135deg,#06D6A0,#059669);color:#fff;">
         <h6 class="mb-0">
           <i class="bi bi-person-lines-fill me-2"></i>
-          <span data-lang-fr>Contact du Vendeur</span>
-          <span data-lang-ar>بيانات البائع</span>
+          <span data-lang-fr>Nous Contacter</span>
+          <span data-lang-ar>تواصل معنا</span>
         </h6>
       </div>
       <div class="card-body p-3">
-
-        {% if prop.contact_agency %}
-        <div class="d-flex align-items-center mb-3 p-2 rounded" style="background:rgba(6,214,160,0.08);">
-          <i class="bi bi-building me-3 fs-4 text-success"></i>
-          <div>
-            <div class="text-muted small">
-              <span data-lang-fr>Agence / Promoteur</span>
-              <span data-lang-ar>الوكالة / المطور</span>
-            </div>
-            <div class="fw-bold text-white">{{ prop.contact_agency }}</div>
-          </div>
-        </div>
-        {% elif prop.contact_name %}
-        <div class="d-flex align-items-center mb-3 p-2 rounded" style="background:rgba(6,214,160,0.08);">
-          <i class="bi bi-person-circle me-3 fs-4 text-success"></i>
-          <div>
-            <div class="text-muted small">
-              <span data-lang-fr>Annonceur</span>
-              <span data-lang-ar>المُعلن</span>
-            </div>
-            <div class="fw-bold text-white">{{ prop.contact_name }}</div>
-          </div>
-        </div>
-        {% endif %}
-
-        {% if prop.contact_phone %}
-        <a href="tel:{{ prop.contact_phone }}"
-           class="btn btn-success w-100 mb-2 fw-bold">
-          <i class="bi bi-telephone-fill me-2"></i>
-          {{ prop.contact_phone }}
-        </a>
-        {% endif %}
-
-        {% if prop.contact_phone2 %}
-        <a href="tel:{{ prop.contact_phone2 }}"
-           class="btn btn-outline-success w-100 mb-2">
-          <i class="bi bi-telephone me-2"></i>
-          {{ prop.contact_phone2 }}
-        </a>
-        {% endif %}
-
-        {% if prop.contact_whatsapp %}
-          {% if 'wa.me' in prop.contact_whatsapp or 'whatsapp.com' in prop.contact_whatsapp %}
-          {# Lien WhatsApp direct (Agenz, Avito) #}
-          <a href="{{ prop.contact_whatsapp }}"
-             target="_blank" rel="noopener"
-             class="btn w-100 mb-2 fw-bold"
-             style="background:#25D366;color:#fff;border:none;">
-            <i class="bi bi-whatsapp me-2"></i>
-            <span data-lang-fr>Contacter sur WhatsApp</span>
-            <span data-lang-ar>التواصل عبر واتساب</span>
-          </a>
-          {% else %}
-          {# URL annonce source (Mubawab) — WhatsApp accessible sur le site #}
-          <a href="{{ prop.contact_whatsapp }}"
-             target="_blank" rel="noopener"
-             class="btn w-100 mb-2 fw-bold"
-             style="background:#25D366;color:#fff;border:none;">
-            <i class="bi bi-whatsapp me-2"></i>
-            <span data-lang-fr>WhatsApp via {{ prop.source|title }}</span>
-            <span data-lang-ar>واتساب عبر {{ prop.source|title }}</span>
-          </a>
-          {% endif %}
-        {% elif prop.contact_phone %}
-        <a href="https://wa.me/{{ prop.contact_phone|cut:' '|cut:'-' }}"
+        <p class="text-muted small mb-3">
+          <span data-lang-fr>Intéressé par ce bien ? Contactez notre équipe Orchid Island.</span>
+          <span data-lang-ar>مهتم بهذا العقار؟ تواصل مع فريق Orchid Island.</span>
+        </p>
+        <a href="https://www.orchidisland.immo/contact-us/"
            target="_blank" rel="noopener"
-           class="btn w-100 mb-2"
+           class="btn btn-success w-100 mb-2 fw-bold">
+          <i class="bi bi-envelope-fill me-2"></i>
+          <span data-lang-fr>Formulaire de contact</span>
+          <span data-lang-ar>نموذج الاتصال</span>
+        </a>
+        <a href="https://api.whatsapp.com/send?phone=212618688888"
+           target="_blank" rel="noopener"
+           class="btn w-100 fw-bold"
            style="background:#25D366;color:#fff;border:none;">
           <i class="bi bi-whatsapp me-2"></i>
-          WhatsApp
+          <span data-lang-fr>Contacter sur WhatsApp</span>
+          <span data-lang-ar>التواصل عبر واتساب</span>
         </a>
-        {% endif %}
-
-        {% if prop.contact_email %}
-        <a href="mailto:{{ prop.contact_email }}"
-           class="btn btn-outline-info w-100 mb-2">
-          <i class="bi bi-envelope me-2"></i>
-          {{ prop.contact_email }}
-        </a>
-        {% endif %}
-
-        {% if prop.contact_type %}
-        <div class="text-center mt-2">
-          <span class="badge {% if prop.contact_type == 'agence' %}bg-info{% elif prop.contact_type == 'particulier' %}bg-secondary{% else %}bg-dark{% endif %}">
-            {% if prop.contact_type == 'agence' %}
-              <i class="bi bi-building me-1"></i>
-              <span data-lang-fr>Agence immobilière</span>
-              <span data-lang-ar>وكالة عقارية</span>
-            {% elif prop.contact_type == 'particulier' %}
-              <i class="bi bi-person me-1"></i>
-              <span data-lang-fr>Particulier</span>
-              <span data-lang-ar>خاص</span>
-            {% else %}
-              {{ prop.contact_type }}
-            {% endif %}
-          </span>
-        </div>
-        {% endif %}
-
-      </div>
-    </div>
-    {% else %}
-    <!-- Pas de contact en DB → bouton vers l'annonce source -->
-    <div class="card mb-4">
-      <div class="card-body text-center p-3">
-        <i class="bi bi-person-lines-fill fs-3 text-muted mb-2 d-block"></i>
-        <p class="text-muted small mb-3">
-          <span data-lang-fr>Contact disponible sur le site source</span>
-          <span data-lang-ar>التواصل متاح على الموقع الأصلي</span>
-        </p>
-        {% if prop.url %}
-        <a href="{{ prop.url }}" target="_blank" rel="noopener"
-           class="btn btn-primary w-100">
-          <i class="bi bi-box-arrow-up-right me-2"></i>
-          <span data-lang-fr>Voir le contact</span>
-          <span data-lang-ar>عرض جهة الاتصال</span>
-        </a>
-        {% endif %}
       </div>
     </div>
     {% endif %}
