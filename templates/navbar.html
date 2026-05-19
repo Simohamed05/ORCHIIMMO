@@ -4,7 +4,7 @@
     <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'home' %}">
       <i class="bi bi-building-fill text-primary fs-4"></i>
       <span class="fw-bold">ORCHI<span class="text-primary">IMMO</span></span>
-      <span class="badge badge-mad ms-1">🇲🇦 MAD</span>
+      {% if user.is_staff %}<span class="badge badge-mad ms-1">🇲🇦 MAD</span>{% endif %}
     </a>
 
     <!-- Burger mobile -->
