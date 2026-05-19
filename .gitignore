@@ -39,8 +39,8 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Fichiers statiques collectés (générés en prod)
-staticfiles/
+# Fichiers statiques collectés — committés pour garantir leur présence sur Render
+# staticfiles/
 
 # Jupyter Notebooks
 .ipynb_checkpoints
