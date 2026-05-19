@@ -1,4 +1,3 @@
-from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -64,7 +63,6 @@ MAROC_KPI = {
 }
 
 
-@login_required
 def dashboards_view(request):
     """Page principale des tableaux de bord Power BI."""
     return render(request, 'dashboards/index.html', {
