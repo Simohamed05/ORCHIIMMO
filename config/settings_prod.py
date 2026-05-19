@@ -34,7 +34,7 @@ if _DB_URL:
 
 # ─── Fichiers statiques (WhiteNoise) ─────────────────────────────────────────
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # ─── Sécurité HTTPS ───────────────────────────────────────────────────────────
