@@ -34,7 +34,15 @@ if _DB_URL:
 
 # ─── Fichiers statiques (WhiteNoise) ─────────────────────────────────────────
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+# Django 4.2+ remplace STATICFILES_STORAGE par STORAGES
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # ─── Sécurité HTTPS ───────────────────────────────────────────────────────────
