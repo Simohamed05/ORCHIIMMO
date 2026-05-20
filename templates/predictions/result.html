@@ -146,7 +146,7 @@
                 <th><span data-lang-fr>Quartier</span><span data-lang-ar>الحي</span></th>
                 <th><span data-lang-fr>Surface</span><span data-lang-ar>المساحة</span></th>
                 <th><span data-lang-fr>Prix (DH)</span><span data-lang-ar>السعر (DH)</span></th>
-                <th><span data-lang-fr>Lien</span><span data-lang-ar>رابط</span></th>
+                {% if request.user.is_staff %}<th><span data-lang-fr>Lien</span><span data-lang-ar>رابط</span></th>{% endif %}
               </tr>
             </thead>
             <tbody>
@@ -155,6 +155,7 @@
                 <td>{{ comp.district|default:"—" }}</td>
                 <td>{{ comp.area_m2|floatformat:0 }} m²</td>
                 <td class="fw-semibold">{{ comp.price_mad|floatformat:0 }}</td>
+                {% if request.user.is_staff %}
                 <td>
                   {% if comp.url %}
                     <a href="{{ comp.url }}" target="_blank" rel="noopener"
@@ -163,6 +164,7 @@
                     </a>
                   {% else %}—{% endif %}
                 </td>
+                {% endif %}
               </tr>
             {% endfor %}
             </tbody>
