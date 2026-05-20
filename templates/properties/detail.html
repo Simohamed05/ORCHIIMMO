@@ -293,7 +293,6 @@
           {% if prop.contact_whatsapp %}
             {% if 'wa.me' in prop.contact_whatsapp or 'whatsapp.com' in prop.contact_whatsapp %}
             <a href="{{ prop.contact_whatsapp }}"
-               data-wa-text="Bonjour, j'ai consulté cette propriété sur Orchiimmo : {{ prop.title }} à {{ prop.city }}{% if prop.price %} — {{ prop.price|floatformat:0 }} DH{% endif %}{% if prop.area_m2 %} ({{ prop.area_m2 }} m²){% endif %}. Je souhaite avoir plus d'informations sur ce bien. Merci !"
                target="_blank" rel="noopener"
                class="btn w-100 mb-2 fw-bold"
                style="background:#25D366;color:#fff;border:none;">
@@ -313,7 +312,6 @@
             {% endif %}
           {% elif prop.contact_phone %}
           <a href="https://wa.me/{{ prop.contact_phone|cut:' '|cut:'-' }}"
-             data-wa-text="Bonjour, j'ai consulté cette propriété sur Orchiimmo : {{ prop.title }} à {{ prop.city }}{% if prop.price %} — {{ prop.price|floatformat:0 }} DH{% endif %}{% if prop.area_m2 %} ({{ prop.area_m2 }} m²){% endif %}. Je souhaite avoir plus d'informations sur ce bien. Merci !"
              target="_blank" rel="noopener"
              class="btn w-100 mb-2"
              style="background:#25D366;color:#fff;border:none;">
@@ -393,7 +391,8 @@
           <span data-lang-ar>نموذج الاتصال</span>
         </a>
         <a href="https://api.whatsapp.com/send?phone=212618688888"
-           data-wa-text="Bonjour, j'ai consulté cette propriété sur Orchiimmo : {{ prop.title }} à {{ prop.city }}{% if prop.price %} — {{ prop.price|floatformat:0 }} DH{% endif %}{% if prop.area_m2 %} ({{ prop.area_m2 }} m²){% endif %}. Je souhaite avoir plus d'informations sur ce bien. Merci !"
+           data-wa-text="Bonjour, j'ai consulté cette propriété sur Orchiimmo : {{ prop.title }} à {{ prop.city }}{% if prop.area_m2 %} ({{ prop.area_m2 }} m²){% endif %}. Lien : "
+           data-wa-suffix=". Je souhaite avoir plus d'informations sur ce bien. Merci !"
            target="_blank" rel="noopener"
            class="btn w-100 fw-bold"
            style="background:#25D366;color:#fff;border:none;">
@@ -499,7 +498,10 @@
 {% block extra_js %}
 <script>
 document.querySelectorAll('a[data-wa-text]').forEach(function(a) {
-  var text = a.getAttribute('data-wa-text');
+  var propUrl = a.getAttribute('data-prop-url')
+    ? window.location.origin + a.getAttribute('data-prop-url')
+    : window.location.href;
+  var text = a.getAttribute('data-wa-text') + propUrl + (a.getAttribute('data-wa-suffix') || '');
   var href = a.getAttribute('href');
   var sep = href.includes('?') ? '&' : '?';
   a.setAttribute('href', href + sep + 'text=' + encodeURIComponent(text));
