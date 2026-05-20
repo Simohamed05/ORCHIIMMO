@@ -39,6 +39,9 @@ SYSTEM_PREFIX = (
 )
 
 
+_FRIENDLY_ERROR = "Désolé, l'assistant est temporairement indisponible. Veuillez réessayer dans un instant."
+
+
 def _parse_n8n_response(raw: str) -> str:
     """
     Parse la réponse n8n — deux formats possibles :
@@ -54,6 +57,9 @@ def _parse_n8n_response(raw: str) -> str:
     for line in lines:
         try:
             chunk = json.loads(line)
+            if chunk.get('type') == 'error':
+                logger.error(f'[Chatbot Proxy] n8n workflow error: {chunk.get("content", "unknown")}')
+                return _FRIENDLY_ERROR
             if chunk.get('type') in ('begin', 'item', 'end'):
                 is_ndjson = True
             if chunk.get('type') == 'item' and chunk.get('content'):
@@ -64,11 +70,13 @@ def _parse_n8n_response(raw: str) -> str:
     if is_ndjson and text_parts:
         return ''.join(text_parts).strip()
 
-    # Tentative 2 : JSON simple {"output": "..."}
+    # Tentative 2 : JSON simple {"output": "..."} ou {"type":"error",...}
     try:
         data = json.loads(raw)
         if isinstance(data, dict):
-            # Chercher la clé de texte dans l'ordre de priorité
+            if data.get('type') == 'error':
+                logger.error(f'[Chatbot Proxy] n8n workflow error: {data.get("content", "unknown")}')
+                return _FRIENDLY_ERROR
             for key in ('output', 'text', 'message', 'response', 'answer'):
                 if key in data and data[key]:
                     return str(data[key]).strip()
