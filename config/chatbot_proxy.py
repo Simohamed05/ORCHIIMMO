@@ -19,7 +19,7 @@ from django.views.decorators.http import require_http_methods
 logger = logging.getLogger(__name__)
 
 N8N_WEBHOOK_URL = (
-    'https://simohamedhadi.app.n8n.cloud/webhook/'
+    'https://simohadi.app.n8n.cloud/webhook/'
     '59296bb7-cade-4ffa-b9f9-da4bc0b1208a/chat'
 )
 
