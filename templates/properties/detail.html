@@ -293,6 +293,7 @@
           {% if prop.contact_whatsapp %}
             {% if 'wa.me' in prop.contact_whatsapp or 'whatsapp.com' in prop.contact_whatsapp %}
             <a href="{{ prop.contact_whatsapp }}"
+               data-wa-text="Bonjour, j'ai consulté cette propriété sur Orchiimmo : {{ prop.title }} à {{ prop.city }}{% if prop.price %} — {{ prop.price|floatformat:0 }} DH{% endif %}{% if prop.area_m2 %} ({{ prop.area_m2 }} m²){% endif %}. Je souhaite avoir plus d'informations sur ce bien. Merci !"
                target="_blank" rel="noopener"
                class="btn w-100 mb-2 fw-bold"
                style="background:#25D366;color:#fff;border:none;">
@@ -312,6 +313,7 @@
             {% endif %}
           {% elif prop.contact_phone %}
           <a href="https://wa.me/{{ prop.contact_phone|cut:' '|cut:'-' }}"
+             data-wa-text="Bonjour, j'ai consulté cette propriété sur Orchiimmo : {{ prop.title }} à {{ prop.city }}{% if prop.price %} — {{ prop.price|floatformat:0 }} DH{% endif %}{% if prop.area_m2 %} ({{ prop.area_m2 }} m²){% endif %}. Je souhaite avoir plus d'informations sur ce bien. Merci !"
              target="_blank" rel="noopener"
              class="btn w-100 mb-2"
              style="background:#25D366;color:#fff;border:none;">
@@ -499,7 +501,8 @@
 document.querySelectorAll('a[data-wa-text]').forEach(function(a) {
   var text = a.getAttribute('data-wa-text');
   var href = a.getAttribute('href');
-  a.setAttribute('href', href + '&text=' + encodeURIComponent(text));
+  var sep = href.includes('?') ? '&' : '?';
+  a.setAttribute('href', href + sep + 'text=' + encodeURIComponent(text));
 });
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

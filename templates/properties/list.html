@@ -376,6 +376,7 @@
                   {% if user.is_staff %}
                     {% if prop.contact_whatsapp or prop.contact_phone or prop.url %}
                     <a href="{% if prop.contact_whatsapp %}{{ prop.contact_whatsapp }}{% elif prop.contact_phone %}https://wa.me/{{ prop.contact_phone|cut:' '|cut:'-' }}{% else %}{{ prop.url }}{% endif %}"
+                       {% if prop.contact_whatsapp or prop.contact_phone %}data-wa-text="Bonjour, j'ai consulté cette annonce sur Orchiimmo : {{ prop.title }} à {{ prop.city }}{% if prop.price %} — {{ prop.price|floatformat:0 }} DH{% endif %}. Je souhaite avoir plus d'informations. Merci !"{% endif %}
                        target="_blank" rel="noopener"
                        title="{% if prop.contact_whatsapp and 'wa.me' in prop.contact_whatsapp %}Contacter sur WhatsApp{% elif prop.contact_phone %}Contacter sur WhatsApp{% else %}Contacter via {{ prop.source|title }}{% endif %}"
                        onclick="event.stopPropagation();"
@@ -674,7 +675,8 @@ setInterval(() => {
 document.querySelectorAll('a[data-wa-text]').forEach(function(a) {
   var text = a.getAttribute('data-wa-text');
   var href = a.getAttribute('href');
-  a.setAttribute('href', href + '&text=' + encodeURIComponent(text));
+  var sep = href.includes('?') ? '&' : '?';
+  a.setAttribute('href', href + sep + 'text=' + encodeURIComponent(text));
 });
 </script>
 {% endblock %}
