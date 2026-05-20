@@ -386,6 +386,7 @@
                     {% endif %}
                   {% else %}
                   <a href="https://api.whatsapp.com/send?phone=212618688888"
+                     data-wa-text="Bonjour, j'ai consulté cette annonce sur Orchiimmo : {{ prop.title }} à {{ prop.city }}{% if prop.price %} — {{ prop.price|floatformat:0 }} DH{% endif %}. Je souhaite avoir plus d'informations. Merci !"
                      target="_blank" rel="noopener"
                      title="Contacter Orchid Island sur WhatsApp"
                      onclick="event.stopPropagation();"
@@ -669,4 +670,11 @@ setInterval(() => {
   letter-spacing: -.02em;
 }
 </style>
+<script>
+document.querySelectorAll('a[data-wa-text]').forEach(function(a) {
+  var text = a.getAttribute('data-wa-text');
+  var href = a.getAttribute('href');
+  a.setAttribute('href', href + '&text=' + encodeURIComponent(text));
+});
+</script>
 {% endblock %}
