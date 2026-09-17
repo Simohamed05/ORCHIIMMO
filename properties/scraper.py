@@ -109,6 +109,14 @@ HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Connection': 'keep-alive',
     'Referer': 'https://www.google.com/',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'cross-site',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1',
+    'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
 }
 
 _PHONE_RE = re.compile(
@@ -945,10 +953,14 @@ class SaroutyScraper:
                 url = base_url if page == 1 else f'{base_url}?paged={page}'
                 soup = _get(session, url)
                 if not soup:
+                    logger.warning(f'[Sarouty] {url}: requête échouée (voir warning [GET] ci-dessus)')
                     break
 
                 listings = self._extract_listings(soup)
                 if not listings:
+                    logger.warning(f'[Sarouty] {url}: 0 annonce trouvée '
+                                   f'(page reçue mais aucun bloc prix "DH" exploitable, '
+                                   f'{len(str(soup))} octets de HTML)')
                     break
 
                 for listing in listings:
