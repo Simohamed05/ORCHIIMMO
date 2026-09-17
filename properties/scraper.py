@@ -416,6 +416,17 @@ def _delay(lo=1.2, hi=2.8):
     time.sleep(random.uniform(lo, hi))
 
 
+def _debug_snippet(soup) -> str:
+    """Titre + court extrait de texte visible, pour diagnostiquer une page
+    inattendue (blocage anti-bot, interstitiel, redirection...) dans les logs."""
+    try:
+        title = soup.title.get_text(strip=True) if soup.title else ''
+        text = ' '.join(soup.get_text(' ', strip=True).split())[:200]
+        return f'titre="{title}" texte="{text}"'
+    except Exception:
+        return '(extrait indisponible)'
+
+
 def _get(session, url, timeout=25) -> Optional[BeautifulSoup]:
     try:
         r = session.get(url, timeout=timeout, allow_redirects=True)
@@ -959,8 +970,7 @@ class SaroutyScraper:
                 listings = self._extract_listings(soup)
                 if not listings:
                     logger.warning(f'[Sarouty] {url}: 0 annonce trouvée '
-                                   f'(page reçue mais aucun bloc prix "DH" exploitable, '
-                                   f'{len(str(soup))} octets de HTML)')
+                                   f'({len(str(soup))} octets) — {_debug_snippet(soup)}')
                     break
 
                 for listing in listings:
@@ -1288,7 +1298,7 @@ class MarocAnnoncesScraper:
                          if 'DH' in li.get_text() and li.select('a')]
                 if not cards:
                     logger.warning(f'[MarocAnnonces] page {page}: 0 lien annonce et 0 carte fallback '
-                                   f'({len(str(soup))} octets de HTML reçus)')
+                                   f'({len(str(soup))} octets) — {_debug_snippet(soup)}')
                     break
                 for card in cards:
                     listing = self._parse_card(card)
@@ -1571,7 +1581,7 @@ class LogicImmoScraper:
                 cards = soup.select('.sl-item.property-grid, .sl-item, [class*="property-grid"]')
                 if not cards:
                     logger.warning(f'[LogicImmo] {url}: 0 carte trouvée '
-                                   f'({len(str(soup))} octets de HTML reçus)')
+                                   f'({len(str(soup))} octets) — {_debug_snippet(soup)}')
                     break
 
                 for card in cards:
@@ -1680,7 +1690,8 @@ class BikhirScraper:
             cards = (soup.select('[class*="listing"], [class*="annonce"], [class*="property"]')
                      or soup.select('article'))
             if not cards:
-                logger.warning(f'[Bikhir] page {page}: 0 carte trouvée avec les sélecteurs actuels')
+                logger.warning(f'[Bikhir] page {page}: 0 carte trouvée '
+                               f'({len(str(soup))} octets) — {_debug_snippet(soup)}')
                 break
 
             for card in cards:
