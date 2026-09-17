@@ -411,7 +411,9 @@ def _delay(lo=1.2, hi=2.8):
 def _get(session, url, timeout=25) -> Optional[BeautifulSoup]:
     try:
         r = session.get(url, timeout=timeout, allow_redirects=True)
-        if r.status_code == 200:
+        # Certains sites (ex. Sarouty) répondent 202/203 avec un contenu HTML
+        # valide (edge caching / régénération en arrière-plan) — pas une erreur.
+        if 200 <= r.status_code < 300:
             return BeautifulSoup(r.text, 'lxml')
         logger.warning(f'[GET] {url} → {r.status_code}')
     except Exception as e:
@@ -697,11 +699,16 @@ class AvitoScraper:
         for page in range(1, max_pages + 1):
             try:
                 r = session.get(self.BASE.format(page=page), timeout=25)
+                if r.status_code != 200:
+                    logger.warning(f'[Avito] page {page}: HTTP {r.status_code}')
+                    break
                 ads = self._extract_ads(r.text)
                 if not ads:
                     soup = BeautifulSoup(r.text, 'lxml')
                     ads = self._extract_from_soup(soup)
                 if not ads:
+                    logger.warning(f'[Avito] page {page}: 0 annonce trouvée '
+                                   f'(NEXT_DATA et fallback HTML vides, {len(r.text)} octets reçus)')
                     break
                 for ad in ads:
                     listing = self._parse_ad(ad)
@@ -1053,6 +1060,7 @@ class AgenzScraper:
             try:
                 r = session.get(url, timeout=25)
                 if r.status_code != 200:
+                    logger.warning(f'[Agenz] page {page}: HTTP {r.status_code}')
                     break
 
                 # Try JSON (Next.js __NEXT_DATA__)
@@ -1064,6 +1072,8 @@ class AgenzScraper:
                     listings = self._extract_html(soup)
 
                 if not listings:
+                    logger.warning(f'[Agenz] page {page}: 0 annonce trouvée '
+                                   f'(NEXT_DATA et fallback HTML vides, {len(r.text)} octets reçus)')
                     break
 
                 for listing in listings:
@@ -1232,6 +1242,7 @@ class MarocAnnoncesScraper:
         for page in range(1, max_pages + 1):
             soup = _get(session, self.BASE.format(page=page))
             if not soup:
+                logger.warning(f'[MarocAnnonces] page {page}: requête échouée (voir warning [GET] ci-dessus)')
                 break
 
             # Essayer d'abord les liens directs d'annonces immobilier
@@ -1258,6 +1269,7 @@ class MarocAnnoncesScraper:
                 cards = [li for li in soup.select('li')
                          if 'DH' in li.get_text() and li.select('a')]
                 if not cards:
+                    logger.warning(f'[MarocAnnonces] page {page}: 0 lien annonce et 0 carte fallback trouvés')
                     break
                 for card in cards:
                     listing = self._parse_card(card)
@@ -1528,10 +1540,12 @@ class LogicImmoScraper:
                 url = base_url if page == 1 else re.sub(r'\.html$', f'/page/{page}.html', base_url)
                 soup = _get(session, url)
                 if not soup:
+                    logger.warning(f'[LogicImmo] {url}: requête échouée (voir warning [GET] ci-dessus)')
                     break
 
                 cards = soup.select('.sl-item.property-grid, .sl-item, [class*="property-grid"]')
                 if not cards:
+                    logger.warning(f'[LogicImmo] {url}: 0 carte trouvée avec les sélecteurs actuels')
                     break
 
                 for card in cards:
@@ -1634,11 +1648,13 @@ class BikhirScraper:
         for page in range(1, max_pages + 1):
             soup = _get(session, working_url.format(page=page))
             if not soup:
+                logger.warning(f'[Bikhir] page {page}: requête échouée (voir warning [GET] ci-dessus)')
                 break
 
             cards = (soup.select('[class*="listing"], [class*="annonce"], [class*="property"]')
                      or soup.select('article'))
             if not cards:
+                logger.warning(f'[Bikhir] page {page}: 0 carte trouvée avec les sélecteurs actuels')
                 break
 
             for card in cards:
