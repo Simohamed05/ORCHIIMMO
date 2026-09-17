@@ -81,6 +81,8 @@ class Property(models.Model):
                                        verbose_name='WhatsApp URL directe')
 
     # Méta
+    image_url  = models.URLField(max_length=500, blank=True,
+                                 verbose_name='Image')
     url        = models.URLField(max_length=500, blank=True)
     scraped_at = models.DateTimeField(null=True, blank=True,
                                       verbose_name='Date/Heure scraping')

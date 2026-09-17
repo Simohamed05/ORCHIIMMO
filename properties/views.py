@@ -324,6 +324,7 @@ def scrape_stream(request):
                         'area_m2':       listing.get('area_m2'),
                         'bedrooms':      listing.get('bedrooms'),
                         'url':           listing.get('url', ''),
+                        'image_url':     listing.get('image_url', ''),
                         'is_opportunity': listing.get('is_opportunity', False),
                         'is_new':        listing.get('is_new', False),
                         'id':            listing.get('id'),
