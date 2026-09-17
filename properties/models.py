@@ -100,3 +100,24 @@ class Property(models.Model):
 
     def has_geo(self):
         return bool(self.latitude and self.longitude)
+
+
+class PropertyImage(models.Model):
+    """Photo supplémentaire d'une annonce (galerie). image_url sur Property
+    reste la couverture ; toutes les photos (y compris la couverture) sont
+    aussi dupliquées ici pour permettre l'affichage en galerie."""
+    property = models.ForeignKey(Property, on_delete=models.CASCADE,
+                                 related_name='images')
+    url      = models.URLField(max_length=500)
+    position = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['position', 'id']
+        verbose_name = 'Photo annonce'
+        verbose_name_plural = 'Photos annonce'
+        constraints = [
+            models.UniqueConstraint(fields=['property', 'url'], name='unique_property_image_url'),
+        ]
+
+    def __str__(self):
+        return f'{self.property_id} — photo {self.position}'

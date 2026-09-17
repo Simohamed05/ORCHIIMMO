@@ -31,7 +31,22 @@
   <!-- ── Fiche principale ────────────────────────────────────────────────── -->
   <div class="col-lg-8">
     <div class="card shadow-sm mb-4 overflow-hidden">
-      {% if prop.image_url %}
+      {% if prop.images.all %}
+      <div class="detail-hero-img">
+        <img id="hero-img" src="{{ prop.images.all.0.url }}" alt="{{ prop.title }}"
+             onerror="this.closest('.detail-hero-img').remove();">
+      </div>
+      {% if prop.images.all|length > 1 %}
+      <div class="detail-thumbs">
+        {% for img in prop.images.all %}
+          <img src="{{ img.url }}" alt="" loading="lazy"
+               class="detail-thumb{% if forloop.first %} active{% endif %}"
+               onclick="document.getElementById('hero-img').src=this.src; document.querySelectorAll('.detail-thumb').forEach(t=>t.classList.remove('active')); this.classList.add('active');"
+               onerror="this.remove();">
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% elif prop.image_url %}
       <div class="detail-hero-img">
         <img src="{{ prop.image_url }}" alt="{{ prop.title }}"
              onerror="this.closest('.detail-hero-img').remove();">

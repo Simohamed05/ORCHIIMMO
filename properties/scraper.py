@@ -274,6 +274,11 @@ def _guess_type(text: str) -> str:
 
 _BAD_IMG_PATTERNS = ('data:image', 'placeholder', 'no-image', 'no_image',
                      'blank.gif', 'blank.png', 'spacer.gif', 'default-')
+_BAD_IMG_KEYWORDS = ('logo', 'icon', 'sprite', 'favicon', 'avatar',
+                     'maps.google', 'googleapis.com/maps', 'staticmap',
+                     'marker', 'pin.png', 'whatsapp-icon', 'facebook.com',
+                     'social-', 'badge')
+MAX_IMAGES_PER_LISTING = 15
 
 
 def _clean_image_url(raw: str, base_url: str = '') -> str:
@@ -288,6 +293,8 @@ def _clean_image_url(raw: str, base_url: str = '') -> str:
         raw = raw.split(' ')[0].strip()
     if not raw or raw.lower().startswith(_BAD_IMG_PATTERNS):
         return ''
+    if any(k in raw.lower() for k in _BAD_IMG_KEYWORDS):
+        return ''
     if raw.startswith('//'):
         raw = 'https:' + raw
     elif not raw.startswith('http'):
@@ -297,53 +304,98 @@ def _clean_image_url(raw: str, base_url: str = '') -> str:
     return raw[:500]
 
 
-def _extract_card_image(card, base_url: str = '') -> str:
-    """Cherche la première image plausible dans une carte d'annonce (HTML)."""
+def _dedupe(urls: list) -> list:
+    seen = set()
+    out = []
+    for u in urls:
+        if u and u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out[:MAX_IMAGES_PER_LISTING]
+
+
+def _extract_card_images(card, base_url: str = '') -> list:
+    """Cherche toutes les images plausibles dans une carte d'annonce (HTML)."""
     if card is None:
-        return ''
+        return []
+    found = []
     for img in card.find_all('img'):
         for attr in ('data-src', 'data-lazy-src', 'data-original', 'srcset', 'src'):
             val = img.get(attr)
             if val:
                 url = _clean_image_url(val, base_url)
                 if url:
-                    return url
+                    found.append(url)
+                    break
     # Fallback : image de fond CSS inline (style="background-image:url(...)")
     for el in card.find_all(style=re.compile(r'background-image')):
         m = re.search(r'background-image\s*:\s*url\((.*?)\)', el.get('style', ''))
         if m:
             url = _clean_image_url(m.group(1).strip('\'"'), base_url)
             if url:
-                return url
-    return ''
+                found.append(url)
+    return _dedupe(found)
 
 
-def _extract_page_image(soup, base_url: str = '') -> str:
-    """Cherche l'image principale d'une page de détail : og:image, puis JSON-LD, puis <img>."""
+def _extract_card_image(card, base_url: str = '') -> str:
+    imgs = _extract_card_images(card, base_url)
+    return imgs[0] if imgs else ''
+
+
+def _extract_page_images(soup, base_url: str = '') -> list:
+    """
+    Cherche toutes les photos d'une page de détail :
+      1. Toutes les balises <meta property="og:image"> (souvent une par photo)
+      2. Le(s) champ(s) "image" du JSON-LD (liste ou valeur unique)
+      3. Les <img> dans un conteneur de galerie identifiable
+         (class contenant gallery/carousel/slider/slick/swiper/photos)
+    Ne remonte JAMAIS sur les <img> de la page entière (logos, cartes, pubs).
+    """
     if soup is None:
-        return ''
-    meta = soup.find('meta', attrs={'property': 'og:image'}) or soup.find('meta', attrs={'name': 'og:image'})
-    if meta and meta.get('content'):
-        url = _clean_image_url(meta['content'], base_url)
-        if url:
-            return url
+        return []
+    found = []
+
+    for meta in soup.find_all('meta', attrs={'property': 'og:image'}):
+        if meta.get('content'):
+            url = _clean_image_url(meta['content'], base_url)
+            if url:
+                found.append(url)
+
     for scr in soup.find_all('script', type='application/ld+json'):
         try:
             d = json.loads(scr.get_text())
             if isinstance(d, list):
                 d = d[0] if d else {}
             image = d.get('image') if isinstance(d, dict) else None
-            if isinstance(image, list) and image:
-                image = image[0]
             if isinstance(image, dict):
-                image = image.get('url', '')
-            if image:
-                url = _clean_image_url(str(image), base_url)
+                image = [image.get('url', '')]
+            elif isinstance(image, str):
+                image = [image]
+            elif not isinstance(image, list):
+                image = []
+            for im in image:
+                if isinstance(im, dict):
+                    im = im.get('url', '')
+                url = _clean_image_url(str(im or ''), base_url)
                 if url:
-                    return url
+                    found.append(url)
         except Exception:
             pass
-    return _extract_card_image(soup, base_url)
+
+    gallery = soup.select(
+        '[class*="gallery" i], [class*="carousel" i], [class*="slider" i], '
+        '[class*="slick" i], [class*="swiper" i], [class*="photos" i], '
+        '[id*="gallery" i], [id*="carousel" i]'
+    )
+    for container in gallery:
+        found.extend(_extract_card_images(container, base_url))
+
+    return _dedupe(found)
+
+
+def _extract_page_image(soup, base_url: str = '') -> str:
+    imgs = _extract_page_images(soup, base_url)
+    return imgs[0] if imgs else ''
 
 
 def _new_session() -> requests.Session:
@@ -371,7 +423,7 @@ def _empty_contact() -> dict:
     return {
         'contact_name': '', 'contact_phone': '', 'contact_phone2': '',
         'contact_email': '', 'contact_agency': '', 'contact_type': '',
-        'contact_whatsapp': '', 'image_url': '',
+        'contact_whatsapp': '', 'image_url': '', 'image_urls': [],
     }
 
 
@@ -501,8 +553,10 @@ def _fetch_detail_contact(session, url: str) -> dict:
             if email and 'noreply' not in email and 'support' not in email:
                 contact['contact_email'] = email
 
-        # ── 8. Image principale (og:image / JSON-LD / <img>) ───────────────────
-        contact['image_url'] = _extract_page_image(soup, url)
+        # ── 8. Toutes les photos (og:image / JSON-LD / galerie) ─────────────────
+        imgs = _extract_page_images(soup, url)
+        contact['image_urls'] = imgs
+        contact['image_url'] = imgs[0] if imgs else ''
 
     except Exception as e:
         logger.debug(f'[Contact] Erreur detail ({url[:60]}): {e}')
@@ -614,6 +668,7 @@ class MubawabScraper:
         agency_el = card.select_one('.agencyName, .agency-name, .userName, .user-name, .agencyInfo')
         agency = agency_el.get_text(strip=True) if agency_el else ''
 
+        card_images = _extract_card_images(card, self.BASE)
         contact = {
             'contact_phone':  phones[0] if phones else '',
             'contact_phone2': phones[1] if len(phones) > 1 else '',
@@ -621,7 +676,8 @@ class MubawabScraper:
             'contact_agency': agency[:200],
             'contact_name':   agency[:200],
             'contact_type':   _detect_contact_type(agency + full_text),
-            'image_url':      _extract_card_image(card, self.BASE),
+            'image_url':      card_images[0] if card_images else '',
+            'image_urls':     card_images,
         }
         return _make_listing(self.SOURCE, city or 'Maroc', dist,
                              _guess_type(cat + ' ' + title), title,
@@ -788,6 +844,7 @@ class AvitoScraper:
         contact_type   = ('agence' if seller.get('type') == 'store'
                           else 'particulier' if seller.get('type') == 'private' else '')
 
+        images = self._extract_json_images(ad)
         contact = {
             'contact_name':   contact_name,
             'contact_agency': contact_agency,
@@ -795,30 +852,41 @@ class AvitoScraper:
             'contact_phone':  '',
             'contact_phone2': '',
             'contact_email':  '',
-            'image_url':      self._extract_json_image(ad),
+            'image_url':      images[0] if images else '',
+            'image_urls':     images,
         }
         return _make_listing(self.SOURCE, city or 'Maroc', dist,
                              _guess_type(title), title, price_mad,
                              area_m2, bedrooms, bathrooms, href, contact)
 
     @staticmethod
-    def _extract_json_image(ad: dict) -> str:
-        """Cherche l'image dans le JSON __NEXT_DATA__ d'une annonce Avito."""
+    def _extract_json_images(ad: dict) -> list:
+        """Cherche toutes les images dans le JSON __NEXT_DATA__ d'une annonce Avito."""
+        found = []
         for key in ('images', 'photos', 'pictures'):
             val = ad.get(key)
-            if isinstance(val, list) and val:
-                first = val[0]
-                if isinstance(first, str):
-                    return _clean_image_url(first)
-                if isinstance(first, dict):
-                    for sub in ('url', 'medium', 'large', 'thumbnail', 'src'):
-                        if first.get(sub):
-                            return _clean_image_url(str(first[sub]))
-        for key in ('thumbnail', 'imageUrl', 'image'):
-            val = ad.get(key)
-            if isinstance(val, str) and val:
-                return _clean_image_url(val)
-        return ''
+            if isinstance(val, list):
+                for item in val:
+                    if isinstance(item, str):
+                        url = _clean_image_url(item)
+                    elif isinstance(item, dict):
+                        url = ''
+                        for sub in ('url', 'large', 'medium', 'thumbnail', 'src'):
+                            if item.get(sub):
+                                url = _clean_image_url(str(item[sub]))
+                                break
+                    else:
+                        url = ''
+                    if url:
+                        found.append(url)
+        if not found:
+            for key in ('thumbnail', 'imageUrl', 'image'):
+                val = ad.get(key)
+                if isinstance(val, str) and val:
+                    url = _clean_image_url(val)
+                    if url:
+                        found.append(url)
+        return _dedupe(found)
 
     def _parse_soup_card(self, card) -> Optional[dict]:
         text = card.get_text(' ')
@@ -835,9 +903,11 @@ class AvitoScraper:
         title = (link.get_text(strip=True) if link else '')[:300]
         area_m2 = _parse_area(text)
 
+        images = _extract_card_images(card, 'https://www.avito.ma')
         return _make_listing(self.SOURCE, 'Maroc', '', _guess_type(title),
                              title, price_mad, area_m2, None, None, href,
-                             {**_empty_contact(), 'image_url': _extract_card_image(card, 'https://www.avito.ma')})
+                             {**_empty_contact(), 'image_url': images[0] if images else '',
+                              'image_urls': images})
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -949,13 +1019,14 @@ class SaroutyScraper:
                 # Contact type
                 contact_type = _detect_contact_type(full_text)
 
+                images = _extract_card_images(container, 'https://www.sarouty.ma')
                 listing = _make_listing(
                     self.SOURCE, city, district,
                     _guess_type(title), title, price_mad,
                     area_m2, bedrooms, bathrooms, href,
                     {**_empty_contact(), 'contact_type': contact_type,
                      'contact_agency': 'Sarouty' if contact_type == 'agence' else '',
-                     'image_url': _extract_card_image(container, 'https://www.sarouty.ma')}
+                     'image_url': images[0] if images else '', 'image_urls': images}
                 )
                 results.append(listing)
 
@@ -1062,13 +1133,19 @@ class AgenzScraper:
         contact = item.get('agency') or item.get('agent') or {}
         agency_name = str(contact.get('name') or contact.get('agency_name') or '')[:200]
 
-        image = (item.get('image') or item.get('photo') or item.get('thumbnail')
-                 or item.get('cover') or '')
-        if isinstance(image, list) and image:
-            image = image[0]
-        if isinstance(image, dict):
-            image = image.get('url', '')
-        image_url = _clean_image_url(str(image or ''), 'https://agenz.ma')
+        raw_images = (item.get('images') or item.get('photos') or item.get('gallery')
+                     or item.get('image') or item.get('photo') or item.get('thumbnail')
+                     or item.get('cover') or [])
+        if not isinstance(raw_images, list):
+            raw_images = [raw_images]
+        images = []
+        for im in raw_images:
+            if isinstance(im, dict):
+                im = im.get('url', '')
+            url = _clean_image_url(str(im or ''), 'https://agenz.ma')
+            if url:
+                images.append(url)
+        images = _dedupe(images)
 
         return _make_listing(
             self.SOURCE, city[:100], district[:100],
@@ -1076,7 +1153,7 @@ class AgenzScraper:
             area_m2, bedrooms, bathrooms, href,
             {**_empty_contact(), 'contact_agency': agency_name,
              'contact_name': agency_name, 'contact_type': 'agence' if agency_name else '',
-             'image_url': image_url}
+             'image_url': images[0] if images else '', 'image_urls': images}
         )
 
     def _extract_html(self, soup: BeautifulSoup) -> list:
@@ -1131,11 +1208,12 @@ class AgenzScraper:
             bedrooms  = _parse_int(re.search(r'(\d+)\s*CH', full_text).group(1)) if re.search(r'(\d+)\s*CH', full_text) else None
             bathrooms = _parse_int(re.search(r'(\d+)\s*SDB', full_text).group(1)) if re.search(r'(\d+)\s*SDB', full_text) else None
 
+            images = _extract_card_images(container, 'https://agenz.ma')
             results.append(_make_listing(
                 self.SOURCE, city, district,
                 _guess_type(ptype_str + ' ' + title), title,
                 price_mad, area_m2, bedrooms, bathrooms, href,
-                {**_empty_contact(), 'image_url': _extract_card_image(container, 'https://agenz.ma')}
+                {**_empty_contact(), 'image_url': images[0] if images else '', 'image_urls': images}
             ))
 
         return results
@@ -1220,9 +1298,10 @@ class MarocAnnoncesScraper:
                 city = v.title()
                 break
         area_m2 = _parse_area(text)
+        images = _extract_card_images(card, 'https://www.marocannonces.com')
         return _make_listing(self.SOURCE, city, '', _guess_type(title + ' ' + text),
                              title, price_mad, area_m2, None, None, href,
-                             {**_empty_contact(), 'image_url': _extract_card_image(card, 'https://www.marocannonces.com')})
+                             {**_empty_contact(), 'image_url': images[0] if images else '', 'image_urls': images})
 
     def _scrape_detail(self, session, url: str, city_hint: str = '') -> Optional[dict]:
         """Scrape une page de détail d'annonce MarocAnnonces — inclut le contact."""
@@ -1293,7 +1372,9 @@ class MarocAnnoncesScraper:
                     contact['contact_agency'] = name_m.group(1).strip()[:200]
                 contact['contact_type'] = _detect_contact_type(ann_text)
 
-            contact['image_url'] = _extract_page_image(soup, url)
+            imgs = _extract_page_images(soup, url)
+            contact['image_urls'] = imgs
+            contact['image_url'] = imgs[0] if imgs else ''
 
             return _make_listing(self.SOURCE, city, dist,
                                  _guess_type(title + ' ' + full_text), title,
@@ -1403,18 +1484,23 @@ class MasakenScraper:
                 if url_city_m:
                     city = url_city_m.group(1).replace('-', ' ').title()
 
-                image = item.get('image', '')
-                if isinstance(image, list) and image:
-                    image = image[0]
-                if isinstance(image, dict):
-                    image = image.get('url', '')
-                image_url = _clean_image_url(str(image or ''), 'https://www.masaken.ma')
+                raw_image = item.get('image', [])
+                if not isinstance(raw_image, list):
+                    raw_image = [raw_image]
+                images = []
+                for im in raw_image:
+                    if isinstance(im, dict):
+                        im = im.get('url', '')
+                    u = _clean_image_url(str(im or ''), 'https://www.masaken.ma')
+                    if u:
+                        images.append(u)
+                images = _dedupe(images)
 
                 results.append(_make_listing(
                     self.SOURCE, city, '',
                     _guess_type(ptype + ' ' + name), name,
                     price_mad, area_m2, bedrooms, None, url,
-                    {**_empty_contact(), 'image_url': image_url}
+                    {**_empty_contact(), 'image_url': images[0] if images else '', 'image_urls': images}
                 ))
             except Exception:
                 continue
@@ -1508,13 +1594,14 @@ class LogicImmoScraper:
         if price_mad < 100_000:
             return None
 
+        images = _extract_card_images(card, 'https://logicimmo.ma')
         return _make_listing(
             self.SOURCE, city, district,
             _guess_type(title), title, price_mad,
             area_m2, bedrooms, bathrooms, href,
             {**_empty_contact(), 'contact_agency': 'Logic-Immo.ma',
              'contact_type': 'agence',
-             'image_url': _extract_card_image(card, 'https://logicimmo.ma')}
+             'image_url': images[0] if images else '', 'image_urls': images}
         )
 
 
@@ -1586,6 +1673,7 @@ class BikhirScraper:
         email    = _extract_email(text)
         bedrooms = _parse_int(re.search(r'(\d+)\s*(?:ch|chambre)', text, re.I).group(1)) if re.search(r'(\d+)\s*(?:ch|chambre)', text, re.I) else None
 
+        bikhir_images = _extract_card_images(card, 'https://www.bikhir.ma')
         contact = {
             'contact_phone':  phones[0] if phones else '',
             'contact_phone2': phones[1] if len(phones) > 1 else '',
@@ -1593,7 +1681,8 @@ class BikhirScraper:
             'contact_name':   '',
             'contact_agency': '',
             'contact_type':   _detect_contact_type(text),
-            'image_url':      _extract_card_image(card, 'https://www.bikhir.ma'),
+            'image_url':      bikhir_images[0] if bikhir_images else '',
+            'image_urls':     bikhir_images,
         }
         return _make_listing(self.SOURCE, city, dist,
                              _guess_type(title), title, price_mad,
@@ -1619,6 +1708,25 @@ SCRAPERS = {
 def _is_opportunity(listing: dict) -> bool:
     ppm2 = listing.get('price_per_m2_mad')
     return bool(ppm2 and ppm2 < 9_000)
+
+
+def _save_property_images(prop, image_urls: list):
+    """Enregistre les photos d'une annonce en galerie (ignore les doublons)."""
+    from properties.models import PropertyImage
+    if not image_urls:
+        return
+    try:
+        existing_urls = set(
+            PropertyImage.objects.filter(property_id=prop.pk).values_list('url', flat=True)
+        )
+        new_rows = [
+            PropertyImage(property_id=prop.pk, url=u, position=i)
+            for i, u in enumerate(image_urls) if u not in existing_urls
+        ]
+        if new_rows:
+            PropertyImage.objects.bulk_create(new_rows, ignore_conflicts=True)
+    except Exception as e:
+        logger.debug(f'[DB] Erreur sauvegarde images (property {prop.pk}): {e}')
 
 
 def scrape_all(sources: list = None, max_pages: int = 5,
@@ -1679,6 +1787,7 @@ def scrape_all(sources: list = None, max_pages: int = 5,
                         listing['id']     = prop.pk
                         listing['is_new'] = True
                         total_new += 1
+                        _save_property_images(prop, listing.get('image_urls', []))
                     except Exception as e:
                         logger.error(f'[DB] Erreur ({source_name}): {e}')
                         listing['is_new'] = False
@@ -1717,7 +1826,8 @@ def scrape_all(sources: list = None, max_pages: int = 5,
                                     update_fields['image_url'] = listing['image_url']
                                 if update_fields:
                                     prop_qs.update(**update_fields)
-                                    listing['id'] = existing.pk
+                                listing['id'] = existing.pk
+                                _save_property_images(existing, listing.get('image_urls', []))
                         except Exception as e:
                             logger.debug(f'[DB] Update contact ({url[:40]}): {e}')
 
