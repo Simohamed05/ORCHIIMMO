@@ -1251,6 +1251,12 @@ class MarocAnnoncesScraper:
 
     def scrape(self, max_pages=5, city_filter='') -> Iterator[dict]:
         session = _new_session()
+        # Visite la page d'accueil d'abord pour obtenir les cookies de session
+        # (sans ça, le site sert une page vide de toute annonce)
+        try:
+            session.get('https://www.marocannonces.com/', timeout=15)
+        except Exception:
+            pass
         for page in range(1, max_pages + 1):
             soup = _get(session, self.BASE.format(page=page))
             if not soup:
@@ -1281,7 +1287,8 @@ class MarocAnnoncesScraper:
                 cards = [li for li in soup.select('li')
                          if 'DH' in li.get_text() and li.select('a')]
                 if not cards:
-                    logger.warning(f'[MarocAnnonces] page {page}: 0 lien annonce et 0 carte fallback trouvés')
+                    logger.warning(f'[MarocAnnonces] page {page}: 0 lien annonce et 0 carte fallback '
+                                   f'({len(str(soup))} octets de HTML reçus)')
                     break
                 for card in cards:
                     listing = self._parse_card(card)
@@ -1547,6 +1554,12 @@ class LogicImmoScraper:
 
     def scrape(self, max_pages=2, city_filter='') -> Iterator[dict]:
         session = _new_session()
+        # Visite la page d'accueil d'abord pour obtenir les cookies de session
+        # (sans ça, le site sert une page vide de toute annonce)
+        try:
+            session.get('https://logicimmo.ma/', timeout=15)
+        except Exception:
+            pass
         for base_url in self.URLS:
             for page in range(1, max_pages + 1):
                 url = base_url if page == 1 else re.sub(r'\.html$', f'/page/{page}.html', base_url)
@@ -1557,7 +1570,8 @@ class LogicImmoScraper:
 
                 cards = soup.select('.sl-item.property-grid, .sl-item, [class*="property-grid"]')
                 if not cards:
-                    logger.warning(f'[LogicImmo] {url}: 0 carte trouvée avec les sélecteurs actuels')
+                    logger.warning(f'[LogicImmo] {url}: 0 carte trouvée '
+                                   f'({len(str(soup))} octets de HTML reçus)')
                     break
 
                 for card in cards:
