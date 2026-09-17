@@ -444,16 +444,31 @@ class _HeadlessBrowser:
     """
     Session Playwright réutilisable pour plusieurs pages d'un même site.
     Réservé aux sites confirmés comme servant une page de vérification
-    anti-bot en JavaScript (LogicImmo, MarocAnnonces) — de simples requêtes
-    HTTP ne peuvent pas la résoudre. Un seul navigateur par source, fermé
+    anti-bot en JavaScript (LogicImmo, MarocAnnonces) ou un blocage 403
+    lié à l'empreinte TLS (Avito, Agenz) — de simples requêtes HTTP ne
+    peuvent pas le résoudre. Un seul navigateur par source, fermé
     explicitement après usage pour limiter la consommation mémoire (plan
     Render gratuit à 512 Mo).
+
+    IMPORTANT : Playwright (API sync) manipule la boucle asyncio du thread
+    qui l'appelle. Exécuté directement dans un thread Gunicorn (gthread),
+    ça laisse ce thread dans un état où Django croit être dans un contexte
+    async et bloque ensuite tout appel ORM sur ce même thread
+    (SynchronousOnlyOperation), potentiellement pour d'autres requêtes
+    servies par ce thread ensuite. Toute interaction Playwright est donc
+    isolée dans un unique thread dédié (ThreadPoolExecutor à 1 worker),
+    jamais exécutée directement dans le thread appelant.
     """
 
     def __init__(self):
+        self._executor = None
         self._pw = None
         self._browser = None
         self._context = None
+
+    def _run(self, fn, timeout: float):
+        fut = self._executor.submit(fn)
+        return fut.result(timeout=timeout)
 
     def start(self) -> bool:
         try:
@@ -461,7 +476,13 @@ class _HeadlessBrowser:
         except ImportError:
             logger.info('[Playwright] module non installé — fallback JS désactivé')
             return False
-        try:
+
+        import concurrent.futures
+        self._executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix='playwright'
+        )
+
+        def _init():
             self._pw = sync_playwright().start()
             self._browser = self._pw.chromium.launch(
                 headless=True,
@@ -471,6 +492,9 @@ class _HeadlessBrowser:
             self._context = self._browser.new_context(
                 user_agent=HEADERS['User-Agent'], locale='fr-FR',
             )
+
+        try:
+            self._run(_init, timeout=40)
             return True
         except Exception as e:
             logger.warning(f'[Playwright] démarrage impossible : {e}')
@@ -478,41 +502,52 @@ class _HeadlessBrowser:
             return False
 
     def get_html(self, url: str, wait_selector: str = None, timeout_ms: int = 20000) -> Optional[str]:
-        if not self._context:
+        if not self._executor or not self._context:
             return None
-        page = None
-        try:
+
+        def _fetch():
             page = self._context.new_page()
-            page.goto(url, timeout=timeout_ms, wait_until='domcontentloaded')
-            if wait_selector:
-                try:
-                    page.wait_for_selector(wait_selector, timeout=timeout_ms)
-                except Exception:
-                    pass  # challenge anti-bot non résolu à temps — on prend ce qu'il y a
-            else:
-                page.wait_for_timeout(4000)
-            return page.content()
-        except Exception as e:
-            logger.warning(f'[Playwright] {url}: {e}')
-            return None
-        finally:
-            if page:
+            try:
+                page.goto(url, timeout=timeout_ms, wait_until='domcontentloaded')
+                if wait_selector:
+                    try:
+                        page.wait_for_selector(wait_selector, timeout=timeout_ms)
+                    except Exception:
+                        pass  # challenge anti-bot non résolu à temps — on prend ce qu'il y a
+                else:
+                    page.wait_for_timeout(4000)
+                return page.content()
+            finally:
                 try:
                     page.close()
                 except Exception:
                     pass
 
+        try:
+            return self._run(_fetch, timeout=(timeout_ms / 1000) + 15)
+        except Exception as e:
+            logger.warning(f'[Playwright] {url}: {e}')
+            return None
+
     def close(self):
-        try:
-            if self._browser:
-                self._browser.close()
-        except Exception:
-            pass
-        try:
-            if self._pw:
-                self._pw.stop()
-        except Exception:
-            pass
+        if self._executor:
+            def _shutdown():
+                try:
+                    if self._browser:
+                        self._browser.close()
+                except Exception:
+                    pass
+                try:
+                    if self._pw:
+                        self._pw.stop()
+                except Exception:
+                    pass
+            try:
+                self._run(_shutdown, timeout=15)
+            except Exception:
+                pass
+            self._executor.shutdown(wait=True)
+            self._executor = None
         self._browser = None
         self._context = None
         self._pw = None
