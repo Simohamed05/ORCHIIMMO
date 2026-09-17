@@ -440,6 +440,84 @@ def _get(session, url, timeout=25) -> Optional[BeautifulSoup]:
     return None
 
 
+class _HeadlessBrowser:
+    """
+    Session Playwright réutilisable pour plusieurs pages d'un même site.
+    Réservé aux sites confirmés comme servant une page de vérification
+    anti-bot en JavaScript (LogicImmo, MarocAnnonces) — de simples requêtes
+    HTTP ne peuvent pas la résoudre. Un seul navigateur par source, fermé
+    explicitement après usage pour limiter la consommation mémoire (plan
+    Render gratuit à 512 Mo).
+    """
+
+    def __init__(self):
+        self._pw = None
+        self._browser = None
+        self._context = None
+
+    def start(self) -> bool:
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            logger.info('[Playwright] module non installé — fallback JS désactivé')
+            return False
+        try:
+            self._pw = sync_playwright().start()
+            self._browser = self._pw.chromium.launch(
+                headless=True,
+                args=['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
+                      '--single-process', '--no-zygote'],
+            )
+            self._context = self._browser.new_context(
+                user_agent=HEADERS['User-Agent'], locale='fr-FR',
+            )
+            return True
+        except Exception as e:
+            logger.warning(f'[Playwright] démarrage impossible : {e}')
+            self.close()
+            return False
+
+    def get_html(self, url: str, wait_selector: str = None, timeout_ms: int = 20000) -> Optional[str]:
+        if not self._context:
+            return None
+        page = None
+        try:
+            page = self._context.new_page()
+            page.goto(url, timeout=timeout_ms, wait_until='domcontentloaded')
+            if wait_selector:
+                try:
+                    page.wait_for_selector(wait_selector, timeout=timeout_ms)
+                except Exception:
+                    pass  # challenge anti-bot non résolu à temps — on prend ce qu'il y a
+            else:
+                page.wait_for_timeout(4000)
+            return page.content()
+        except Exception as e:
+            logger.warning(f'[Playwright] {url}: {e}')
+            return None
+        finally:
+            if page:
+                try:
+                    page.close()
+                except Exception:
+                    pass
+
+    def close(self):
+        try:
+            if self._browser:
+                self._browser.close()
+        except Exception:
+            pass
+        try:
+            if self._pw:
+                self._pw.stop()
+        except Exception:
+            pass
+        self._browser = None
+        self._context = None
+        self._pw = None
+
+
 def _empty_contact() -> dict:
     return {
         'contact_name': '', 'contact_phone': '', 'contact_phone2': '',
@@ -1259,63 +1337,83 @@ class MarocAnnoncesScraper:
     SOURCE = 'marocannonces'
     BASE   = 'https://www.marocannonces.com/categorie/16/Vente-immobilier.html?p={page}'
 
+    ANNONCE_LINK_RE = re.compile(r'categorie/(?:3|16|17|18)\d*/[^/]+/annonce/\d+', re.I)
+
     def scrape(self, max_pages=5, city_filter='') -> Iterator[dict]:
         session = _new_session()
         # Visite la page d'accueil d'abord pour obtenir les cookies de session
-        # (sans ça, le site sert une page vide de toute annonce)
         try:
             session.get('https://www.marocannonces.com/', timeout=15)
         except Exception:
             pass
-        for page in range(1, max_pages + 1):
-            soup = _get(session, self.BASE.format(page=page))
-            if not soup:
-                logger.warning(f'[MarocAnnonces] page {page}: requête échouée (voir warning [GET] ci-dessus)')
-                break
 
-            # Essayer d'abord les liens directs d'annonces immobilier
-            annonce_links = soup.find_all(
-                'a', href=re.compile(r'categorie/(?:3|16|17|18)\d*/[^/]+/annonce/\d+', re.I)
-            )
-            if annonce_links:
-                seen = set()
-                for a_tag in annonce_links:
-                    href = a_tag.get('href', '')
-                    if not href.startswith('http'):
-                        href = 'https://www.marocannonces.com/' + href.lstrip('/')
-                    if href in seen:
-                        continue
-                    seen.add(href)
-                    listing = self._scrape_detail(session, href)
-                    if listing:
-                        if city_filter and city_filter.lower() not in listing['city'].lower():
-                            continue
-                        yield listing
-                    _delay(0.3, 0.7)
-            else:
-                # Fallback : li contenant "DH"
-                cards = [li for li in soup.select('li')
-                         if 'DH' in li.get_text() and li.select('a')]
-                if not cards:
+        browser = None
+
+        def _ensure_browser():
+            nonlocal browser
+            if browser is None:
+                browser = _HeadlessBrowser()
+                browser.start()
+            return browser
+
+        try:
+            for page in range(1, max_pages + 1):
+                page_url = self.BASE.format(page=page)
+                soup = _get(session, page_url)
+                annonce_links = soup.find_all('a', href=self.ANNONCE_LINK_RE) if soup else []
+                cards = ([li for li in soup.select('li') if 'DH' in li.get_text() and li.select('a')]
+                         if soup and not annonce_links else [])
+
+                if not annonce_links and not cards:
+                    # Page de vérification anti-bot JS — tentative via navigateur headless
+                    html = _ensure_browser().get_html(page_url, wait_selector='a[href*="/annonce/"]')
+                    if html:
+                        soup = BeautifulSoup(html, 'lxml')
+                        annonce_links = soup.find_all('a', href=self.ANNONCE_LINK_RE)
+                        if not annonce_links:
+                            cards = [li for li in soup.select('li') if 'DH' in li.get_text() and li.select('a')]
+
+                if not annonce_links and not cards:
                     logger.warning(f'[MarocAnnonces] page {page}: 0 lien annonce et 0 carte fallback '
-                                   f'({len(str(soup))} octets) — {_debug_snippet(soup)}')
+                                   f'même via navigateur headless '
+                                   f'({_debug_snippet(soup) if soup else "aucune page reçue"})')
                     break
-                for card in cards:
-                    listing = self._parse_card(card)
-                    if listing:
-                        if city_filter and city_filter.lower() not in listing['city'].lower():
-                            continue
-                        # Enrichir le contact depuis la page de détail
-                        if listing.get('url') and 'marocannonces' in listing['url']:
-                            dc = _fetch_detail_contact(session, listing['url'])
-                            for k, v in dc.items():
-                                if v and not listing.get(k):
-                                    listing[k] = v
-                            _delay(0.3, 0.7)
-                        yield listing
 
-            if page < max_pages:
-                _delay()
+                if annonce_links:
+                    seen = set()
+                    for a_tag in annonce_links:
+                        href = a_tag.get('href', '')
+                        if not href.startswith('http'):
+                            href = 'https://www.marocannonces.com/' + href.lstrip('/')
+                        if href in seen:
+                            continue
+                        seen.add(href)
+                        listing = self._scrape_detail(session, href, get_browser=_ensure_browser)
+                        if listing:
+                            if city_filter and city_filter.lower() not in listing['city'].lower():
+                                continue
+                            yield listing
+                        _delay(0.3, 0.7)
+                else:
+                    for card in cards:
+                        listing = self._parse_card(card)
+                        if listing:
+                            if city_filter and city_filter.lower() not in listing['city'].lower():
+                                continue
+                            # Enrichir le contact depuis la page de détail
+                            if listing.get('url') and 'marocannonces' in listing['url']:
+                                dc = _fetch_detail_contact(session, listing['url'])
+                                for k, v in dc.items():
+                                    if v and not listing.get(k):
+                                        listing[k] = v
+                                _delay(0.3, 0.7)
+                            yield listing
+
+                if page < max_pages:
+                    _delay()
+        finally:
+            if browser:
+                browser.close()
 
     def _parse_card(self, card, city_hint='') -> Optional[dict]:
         """Fallback si on n'arrive pas à extraire les liens individuels."""
@@ -1344,19 +1442,30 @@ class MarocAnnoncesScraper:
                              title, price_mad, area_m2, None, None, href,
                              {**_empty_contact(), 'image_url': images[0] if images else '', 'image_urls': images})
 
-    def _scrape_detail(self, session, url: str, city_hint: str = '') -> Optional[dict]:
+    def _scrape_detail(self, session, url: str, city_hint: str = '',
+                       get_browser=None) -> Optional[dict]:
         """Scrape une page de détail d'annonce MarocAnnonces — inclut le contact."""
         try:
             soup = _get(session, url)
-            if not soup:
-                return None
-            full_text = soup.get_text(' ')
+            full_text = soup.get_text(' ') if soup else ''
 
             # Prix
-            price_el = soup.select_one('.prix-annonce, .price, [class*="prix"], h2, h1')
+            price_el = soup.select_one('.prix-annonce, .price, [class*="prix"], h2, h1') if soup else None
             price_mad = _parse_price_mad(price_el.get_text(strip=True)) if price_el else None
             if not price_mad:
                 price_mad = _parse_price_mad(full_text)
+
+            if not price_mad and get_browser:
+                # Même page de vérification anti-bot que la liste — retente en headless
+                html = get_browser().get_html(url, wait_selector='.prix-annonce, .price, h1')
+                if html:
+                    soup = BeautifulSoup(html, 'lxml')
+                    full_text = soup.get_text(' ')
+                    price_el = soup.select_one('.prix-annonce, .price, [class*="prix"], h2, h1')
+                    price_mad = _parse_price_mad(price_el.get_text(strip=True)) if price_el else None
+                    if not price_mad:
+                        price_mad = _parse_price_mad(full_text)
+
             if not price_mad:
                 return None
 
@@ -1562,37 +1671,52 @@ class LogicImmoScraper:
         'https://logicimmo.ma/vente-loft-maroc.html',
     ]
 
+    CARD_SELECTOR = '.sl-item.property-grid, .sl-item, [class*="property-grid"]'
+
     def scrape(self, max_pages=2, city_filter='') -> Iterator[dict]:
         session = _new_session()
         # Visite la page d'accueil d'abord pour obtenir les cookies de session
-        # (sans ça, le site sert une page vide de toute annonce)
         try:
             session.get('https://logicimmo.ma/', timeout=15)
         except Exception:
             pass
-        for base_url in self.URLS:
-            for page in range(1, max_pages + 1):
-                url = base_url if page == 1 else re.sub(r'\.html$', f'/page/{page}.html', base_url)
-                soup = _get(session, url)
-                if not soup:
-                    logger.warning(f'[LogicImmo] {url}: requête échouée (voir warning [GET] ci-dessus)')
-                    break
 
-                cards = soup.select('.sl-item.property-grid, .sl-item, [class*="property-grid"]')
-                if not cards:
-                    logger.warning(f'[LogicImmo] {url}: 0 carte trouvée '
-                                   f'({len(str(soup))} octets) — {_debug_snippet(soup)}')
-                    break
+        browser = None
+        try:
+            for base_url in self.URLS:
+                for page in range(1, max_pages + 1):
+                    url = base_url if page == 1 else re.sub(r'\.html$', f'/page/{page}.html', base_url)
+                    soup = _get(session, url)
+                    cards = soup.select(self.CARD_SELECTOR) if soup else []
 
-                for card in cards:
-                    listing = self._parse_card(card)
-                    if listing:
-                        if city_filter and city_filter.lower() not in listing['city'].lower():
-                            continue
-                        yield listing
+                    if not cards:
+                        # Requêtes HTTP simples bloquées par la page de vérification
+                        # anti-bot JS — on tente un navigateur headless en secours.
+                        if browser is None:
+                            browser = _HeadlessBrowser()
+                            browser.start()
+                        html = browser.get_html(url, wait_selector='.sl-item')
+                        if html:
+                            soup = BeautifulSoup(html, 'lxml')
+                            cards = soup.select(self.CARD_SELECTOR)
 
-                if page < max_pages:
-                    _delay()
+                    if not cards:
+                        logger.warning(f'[LogicImmo] {url}: 0 carte trouvée même via navigateur headless '
+                                       f'({_debug_snippet(soup) if soup else "aucune page reçue"})')
+                        break
+
+                    for card in cards:
+                        listing = self._parse_card(card)
+                        if listing:
+                            if city_filter and city_filter.lower() not in listing['city'].lower():
+                                continue
+                            yield listing
+
+                    if page < max_pages:
+                        _delay()
+        finally:
+            if browser:
+                browser.close()
 
     def _parse_card(self, card) -> Optional[dict]:
         # Prix dans .property-info
