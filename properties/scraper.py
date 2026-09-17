@@ -374,7 +374,18 @@ def _extract_page_images(soup, base_url: str = '') -> list:
             d = json.loads(scr.get_text())
             if isinstance(d, list):
                 d = d[0] if d else {}
-            image = d.get('image') if isinstance(d, dict) else None
+            if not isinstance(d, dict):
+                continue
+            # Galerie sous forme d'ItemList Schema.org (ex. Yakeey) :
+            # {"@type":"ItemList","itemListElement":[{"url":"..."}, ...]}
+            if d.get('@type') == 'ItemList':
+                for item in d.get('itemListElement', []):
+                    if isinstance(item, dict):
+                        url = _clean_image_url(str(item.get('url', '')), base_url)
+                        if url:
+                            found.append(url)
+                continue
+            image = d.get('image')
             if isinstance(image, dict):
                 image = [image.get('url', '')]
             elif isinstance(image, str):
@@ -1945,6 +1956,135 @@ class BikhirScraper:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 9. YAKEEY (yakeey.com — plateforme moderne, données embarquées en JSON)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class YakeeyScraper:
+    """
+    Site Next.js server-rendu : chaque page (catalogue et détail) embarque
+    les données complètes de l'annonce dans le HTML sous forme de JSON
+    (flux React Server Components), pas besoin de JS pour les lire. On
+    récupère les liens d'annonces sur les pages catégorie, puis on extrait
+    prix/surface/pièces/ville/quartier/contact/photos depuis chaque fiche
+    via des regex ciblées sur des clés JSON distinctives (ex. "globalPrice").
+    """
+    SOURCE = 'yakeey'
+    CATEGORY_URLS = [
+        'https://yakeey.com/fr-ma/achat/appartement/casablanca',
+        'https://yakeey.com/fr-ma/achat/appartement/rabat',
+        'https://yakeey.com/fr-ma/achat/appartement/marrakech',
+        'https://yakeey.com/fr-ma/achat?propertyCategories=villa%2Cmaison',
+    ]
+    DETAIL_LINK_RE = re.compile(r'href="(/fr-ma/acheter-[a-z0-9\-]+)"', re.I)
+    TYPE_MAP = {
+        'FLAT': 'apartment', 'STUDIO': 'apartment', 'DUPLEX': 'apartment',
+        'TRIPLEX': 'apartment', 'VILLA': 'villa', 'HOUSE': 'villa',
+        'RIAD': 'riad', 'TERRAIN': 'land', 'OFFICE': 'office',
+        'COMMERCIAL_BUILDING': 'office',
+    }
+
+    def scrape(self, max_pages=3, city_filter='') -> Iterator[dict]:
+        session = _new_session()
+        seen = set()
+        max_per_category = max(max_pages * 10, 10)
+
+        for cat_url in self.CATEGORY_URLS:
+            soup = _get(session, cat_url)
+            if not soup:
+                logger.warning(f'[Yakeey] {cat_url}: requête échouée (voir warning [GET] ci-dessus)')
+                continue
+
+            links = list(dict.fromkeys(m.group(1) for m in self.DETAIL_LINK_RE.finditer(str(soup))))
+            if not links:
+                logger.warning(f'[Yakeey] {cat_url}: 0 lien annonce trouvé ({_debug_snippet(soup)})')
+                continue
+
+            fetched = 0
+            for href in links:
+                if href in seen:
+                    continue
+                seen.add(href)
+                detail_url = 'https://yakeey.com' + href
+                listing = self._scrape_detail(session, detail_url)
+                _delay(0.3, 0.6)
+                if not listing:
+                    continue
+                if city_filter and city_filter.lower() not in listing['city'].lower():
+                    continue
+                yield listing
+                fetched += 1
+                if fetched >= max_per_category:
+                    break
+
+    def _scrape_detail(self, session, url: str) -> Optional[dict]:
+        try:
+            soup = _get(session, url)
+            if not soup:
+                return None
+            # Les données de la fiche sont embarquées dans le flux React Server
+            # Components (self.__next_f.push([1,"..."])) : c'est du JSON dont les
+            # guillemets sont échappés (\") car imbriqué dans une chaîne JS.
+            # On déséchappe une fois pour pouvoir regex dessus normalement.
+            html = str(soup).replace('\\"', '"')
+
+            price_m = re.search(r'"globalPrice":(\d+(?:\.\d+)?)', html)
+            price_mad = float(price_m.group(1)) if price_m else None
+            if not price_mad or price_mad <= 0:
+                return None
+
+            title_el = soup.find('title')
+            title = title_el.get_text(strip=True)[:300] if title_el else ''
+
+            area_m = re.search(r'"area":(\d+(?:\.\d+)?)', html)
+            area_m2 = float(area_m.group(1)) if area_m else None
+
+            rooms_m = re.search(r'"rooms":(\d+)', html)
+            bedrooms = int(rooms_m.group(1)) if rooms_m else None
+
+            bath_m = re.search(r'"bathrooms":(\d+)', html)
+            bathrooms = int(bath_m.group(1)) if bath_m else None
+
+            city_m = re.search(r'"city":"([^"]+)"', html)
+            city = city_m.group(1) if city_m else 'Maroc'
+
+            district_m = re.search(r'"neighborhood":"([^"]+)"', html)
+            district = district_m.group(1) if district_m else ''
+
+            type_m = re.search(r'"category":"([A-Z_]+)"\s*,\s*"type":"([A-Z_]+)"', html)
+            category = type_m.group(1) if type_m else ''
+            ptype = self.TYPE_MAP.get(category, _guess_type(title))
+
+            phone_m = re.search(r'"phoneNumber":"(\+?\d{9,15})"', html)
+            phone = phone_m.group(1) if phone_m else ''
+            if phone.startswith('212'):
+                phone = '0' + phone[3:]
+
+            email_m = re.search(r'"agent":\{[^}]*?"email":"([^"]+)"', html)
+            email = email_m.group(1) if email_m else ''
+
+            name_m = re.search(r'"firstName":"([^"]*)","lastName":"([^"]*)"', html)
+            contact_name = f'{name_m.group(1)} {name_m.group(2)}'.strip() if name_m else ''
+
+            images = _extract_page_images(soup, url)
+
+            return _make_listing(
+                self.SOURCE, city, district, ptype, title, price_mad,
+                area_m2, bedrooms, bathrooms, url,
+                {**_empty_contact(),
+                 'contact_phone':  phone,
+                 'contact_email':  email,
+                 'contact_name':   contact_name,
+                 'contact_agency': 'Yakeey',
+                 'contact_type':   'agence',
+                 'image_url':      images[0] if images else '',
+                 'image_urls':     images}
+            )
+        except Exception as e:
+            logger.debug(f'[Yakeey] detail error ({url[:60]}): {e}')
+            return None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ORCHESTRATEUR
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1957,6 +2097,7 @@ SCRAPERS = {
     'masaken':      MasakenScraper,
     'logicimmo':    LogicImmoScraper,
     'bikhir':       BikhirScraper,
+    'yakeey':       YakeeyScraper,
 }
 
 

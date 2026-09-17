@@ -10,6 +10,7 @@ class Property(models.Model):
         ('masaken',       'Masaken'),
         ('logicimmo',     'LogicImmo'),
         ('bikhir',        'Bikhir'),
+        ('yakeey',        'Yakeey'),
         ('autre',         'Autre'),
     ]
     TYPE_CHOICES = [

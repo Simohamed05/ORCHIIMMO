@@ -205,6 +205,7 @@ def property_list(request):
         ('masaken',       'Masaken'),
         ('logicimmo',     'LogicImmo'),
         ('bikhir',        'Bikhir'),
+        ('yakeey',        'Yakeey'),
     ]
 
     return render(request, 'properties/list.html', {
@@ -283,7 +284,7 @@ def scrape_stream(request):
       city      = filtre ville optionnel
     """
     sources_param = request.GET.get('sources',
-        'mubawab,avito,sarouty,agenz,marocannonces,masaken,logicimmo,bikhir'
+        'mubawab,avito,sarouty,agenz,marocannonces,masaken,logicimmo,bikhir,yakeey'
     )
     sources = [s.strip() for s in sources_param.split(',') if s.strip()]
 
