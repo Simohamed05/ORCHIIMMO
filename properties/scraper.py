@@ -1987,45 +1987,70 @@ class YakeeyScraper:
         session = _new_session()
         seen = set()
         max_per_category = max(max_pages * 10, 10)
+        browser = None
 
-        for cat_url in self.CATEGORY_URLS:
-            soup = _get(session, cat_url)
-            if not soup:
-                logger.warning(f'[Yakeey] {cat_url}: requête échouée (voir warning [GET] ci-dessus)')
-                continue
+        def _ensure_browser():
+            nonlocal browser
+            if browser is None:
+                browser = _HeadlessBrowser()
+                browser.start()
+            return browser
 
-            links = list(dict.fromkeys(m.group(1) for m in self.DETAIL_LINK_RE.finditer(str(soup))))
-            if not links:
-                logger.warning(f'[Yakeey] {cat_url}: 0 lien annonce trouvé ({_debug_snippet(soup)})')
-                continue
+        try:
+            for cat_url in self.CATEGORY_URLS:
+                soup = _get(session, cat_url)
+                links = list(dict.fromkeys(m.group(1) for m in self.DETAIL_LINK_RE.finditer(str(soup)))) if soup else []
 
-            fetched = 0
-            for href in links:
-                if href in seen:
+                if not links:
+                    # 403 ou page vide — tentative via navigateur headless
+                    html = _ensure_browser().get_html(cat_url, wait_selector='a[href*="/acheter-"]') or ''
+                    if html:
+                        links = list(dict.fromkeys(m.group(1) for m in self.DETAIL_LINK_RE.finditer(html)))
+                        soup = BeautifulSoup(html, 'lxml') if not soup else soup
+
+                if not links:
+                    logger.warning(f'[Yakeey] {cat_url}: 0 lien annonce trouvé même via navigateur headless '
+                                   f'({_debug_snippet(soup) if soup else "aucune page reçue"})')
                     continue
-                seen.add(href)
-                detail_url = 'https://yakeey.com' + href
-                listing = self._scrape_detail(session, detail_url)
-                _delay(0.3, 0.6)
-                if not listing:
-                    continue
-                if city_filter and city_filter.lower() not in listing['city'].lower():
-                    continue
-                yield listing
-                fetched += 1
-                if fetched >= max_per_category:
-                    break
 
-    def _scrape_detail(self, session, url: str) -> Optional[dict]:
+                fetched = 0
+                for href in links:
+                    if href in seen:
+                        continue
+                    seen.add(href)
+                    detail_url = 'https://yakeey.com' + href
+                    listing = self._scrape_detail(session, detail_url, get_browser=_ensure_browser)
+                    _delay(0.3, 0.6)
+                    if not listing:
+                        continue
+                    if city_filter and city_filter.lower() not in listing['city'].lower():
+                        continue
+                    yield listing
+                    fetched += 1
+                    if fetched >= max_per_category:
+                        break
+        finally:
+            if browser:
+                browser.close()
+
+    def _scrape_detail(self, session, url: str, get_browser=None) -> Optional[dict]:
         try:
             soup = _get(session, url)
-            if not soup:
-                return None
             # Les données de la fiche sont embarquées dans le flux React Server
             # Components (self.__next_f.push([1,"..."])) : c'est du JSON dont les
             # guillemets sont échappés (\") car imbriqué dans une chaîne JS.
             # On déséchappe une fois pour pouvoir regex dessus normalement.
-            html = str(soup).replace('\\"', '"')
+            html = str(soup).replace('\\"', '"') if soup else ''
+
+            if 'globalPrice' not in html and get_browser:
+                # Même blocage anti-bot que la page de liste — retente en headless
+                raw = get_browser().get_html(url, wait_selector='title')
+                if raw:
+                    soup = BeautifulSoup(raw, 'lxml')
+                    html = raw.replace('\\"', '"')
+
+            if not html:
+                return None
 
             price_m = re.search(r'"globalPrice":(\d+(?:\.\d+)?)', html)
             price_mad = float(price_m.group(1)) if price_m else None
