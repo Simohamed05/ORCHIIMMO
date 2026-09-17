@@ -18,9 +18,9 @@ services:
       - key: SECURE_SSL_REDIRECT
         value: "False"
       - key: ALLOWED_HOSTS
-        value: "orchiimmo.onrender.com"
+        value: "orchiimmo.onrender.com,orchiimmo-2a62.onrender.com"
       - key: CSRF_TRUSTED_ORIGINS
-        value: "https://orchiimmo.onrender.com"
+        value: "https://orchiimmo.onrender.com,https://orchiimmo-2a62.onrender.com"
       - key: DJANGO_SUPERUSER_USERNAME
         value: admin
       - key: DJANGO_SUPERUSER_EMAIL
@@ -42,4 +42,4 @@ databases:
   - name: orchiimmo-db-2
     databaseName: orchiimmo_db_2
     plan: free
-    region: oregon
+    region: frankfurt
