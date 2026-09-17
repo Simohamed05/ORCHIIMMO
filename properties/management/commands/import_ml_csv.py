@@ -1,7 +1,10 @@
 """
 Commande Django : importe ml/data/apparts_maroc_ml.csv dans la base.
-Utilisé pour peupler une nouvelle base vide depuis les données ML existantes.
-Ne fait rien si des annonces existent déjà (idempotent).
+Utilisé pour peupler la base depuis les données ML existantes (6432 lignes).
+Idempotent : ne s'exécute que si la base contient moins de MIN_EXPECTED
+annonces (sinon on considère que l'import a déjà eu lieu — évite de
+dupliquer les lignes du CSV sans URL à chaque déploiement). Les annonces
+déjà présentes (ex. avec contact scrappé) sont conservées, jamais supprimées.
 
 Usage :
   python manage.py import_ml_csv
@@ -45,17 +48,27 @@ def _int(v):
         return None
 
 
+MIN_EXPECTED = 6000
+
+
 class Command(BaseCommand):
-    help = 'Peuple la base depuis ml/data/apparts_maroc_ml.csv (seulement si vide)'
+    help = 'Peuple la base depuis ml/data/apparts_maroc_ml.csv (idempotent)'
 
     def handle(self, *args, **options):
-        if Property.objects.exists():
-            self.stdout.write('Base non vide — import ignoré.')
+        current_count = Property.objects.count()
+        if current_count >= MIN_EXPECTED:
+            self.stdout.write(
+                f'Base déjà peuplée ({current_count} annonces) — import ignoré.'
+            )
             return
+
+        existing_urls = set(
+            Property.objects.exclude(url='').values_list('url', flat=True)
+        )
 
         csv_path = os.path.join(
             os.path.dirname(__file__),
-            '..', '..', '..', '..', 'ml', 'data', 'apparts_maroc_ml.csv'
+            '..', '..', '..', 'ml', 'data', 'apparts_maroc_ml.csv'
         )
         csv_path = os.path.abspath(csv_path)
 
@@ -94,6 +107,8 @@ class Command(BaseCommand):
                         continue
                     if not city:
                         continue
+                    if url and url in existing_urls:
+                        continue
 
                     prop_type = TYPE_MAP.get(type_enc, 'apartment')
                     ppm2      = round(price / area) if area and area > 0 else None
@@ -115,6 +130,8 @@ class Command(BaseCommand):
                         url              = url,
                         scraped_at       = now,
                     ))
+                    if url:
+                        existing_urls.add(url)
                 except Exception:
                     errors += 1
 
