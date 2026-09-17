@@ -793,20 +793,46 @@ class AvitoScraper:
 
     def scrape(self, max_pages=5, city_filter='') -> Iterator[dict]:
         session = _new_session()
-        for page in range(1, max_pages + 1):
-            try:
-                r = session.get(self.BASE.format(page=page), timeout=25)
-                if r.status_code != 200:
-                    logger.warning(f'[Avito] page {page}: HTTP {r.status_code}')
-                    break
-                ads = self._extract_ads(r.text)
+        browser = None
+
+        def _ensure_browser():
+            nonlocal browser
+            if browser is None:
+                browser = _HeadlessBrowser()
+                browser.start()
+            return browser
+
+        try:
+            for page in range(1, max_pages + 1):
+                url = self.BASE.format(page=page)
+                ads = []
+                html_text = ''
+                try:
+                    r = session.get(url, timeout=25)
+                    if r.status_code == 200:
+                        html_text = r.text
+                        ads = self._extract_ads(html_text)
+                        if not ads:
+                            ads = self._extract_from_soup(BeautifulSoup(html_text, 'lxml'))
+                    else:
+                        logger.warning(f'[Avito] page {page}: HTTP {r.status_code}')
+                except Exception as e:
+                    logger.warning(f'[Avito] page {page}: {e}')
+
                 if not ads:
-                    soup = BeautifulSoup(r.text, 'lxml')
-                    ads = self._extract_from_soup(soup)
+                    # 403 ou page vide — l'empreinte TLS d'un vrai Chromium
+                    # passe parfois là où de simples requêtes HTTP sont bloquées.
+                    html_text = _ensure_browser().get_html(url, wait_selector='a[href*="/fr/"]') or ''
+                    if html_text:
+                        ads = self._extract_ads(html_text)
+                        if not ads:
+                            ads = self._extract_from_soup(BeautifulSoup(html_text, 'lxml'))
+
                 if not ads:
-                    logger.warning(f'[Avito] page {page}: 0 annonce trouvée '
-                                   f'(NEXT_DATA et fallback HTML vides, {len(r.text)} octets reçus)')
+                    logger.warning(f'[Avito] page {page}: 0 annonce trouvée même via navigateur headless '
+                                   f'({len(html_text)} octets reçus)')
                     break
+
                 for ad in ads:
                     listing = self._parse_ad(ad)
                     if listing:
@@ -821,11 +847,12 @@ class AvitoScraper:
                                 listing['contact_whatsapp'] = wa_url or f'https://wa.me/{phone}?text=Bonjour%2C+je+suis+int%C3%A9ress%C3%A9+par+votre+annonce+sur+Avito'
                             _delay(0.4, 0.8)
                         yield listing
-            except Exception as e:
-                logger.warning(f'[Avito] page {page}: {e}')
-                break
-            if page < max_pages:
-                _delay()
+
+                if page < max_pages:
+                    _delay()
+        finally:
+            if browser:
+                browser.close()
 
     @staticmethod
     def _get_detail_contact(session, url: str):
@@ -1154,26 +1181,43 @@ class AgenzScraper:
     def scrape(self, max_pages=5, city_filter='') -> Iterator[dict]:
         session = _new_session()
         session.headers.update({'Referer': 'https://agenz.ma/'})
+        browser = None
 
-        for page in range(1, max_pages + 1):
-            url = self.BASE.format(page=page)
-            try:
-                r = session.get(url, timeout=25)
-                if r.status_code != 200:
-                    logger.warning(f'[Agenz] page {page}: HTTP {r.status_code}')
-                    break
+        def _ensure_browser():
+            nonlocal browser
+            if browser is None:
+                browser = _HeadlessBrowser()
+                browser.start()
+            return browser
 
-                # Try JSON (Next.js __NEXT_DATA__)
-                listings = self._extract_json(r.text)
+        try:
+            for page in range(1, max_pages + 1):
+                url = self.BASE.format(page=page)
+                listings = []
+                html_text = ''
+                try:
+                    r = session.get(url, timeout=25)
+                    if r.status_code == 200:
+                        html_text = r.text
+                        listings = self._extract_json(html_text)
+                        if not listings:
+                            listings = self._extract_html(BeautifulSoup(html_text, 'lxml'))
+                    else:
+                        logger.warning(f'[Agenz] page {page}: HTTP {r.status_code}')
+                except Exception as e:
+                    logger.warning(f'[Agenz] page {page}: {e}')
 
-                # Fallback: HTML parsing
                 if not listings:
-                    soup = BeautifulSoup(r.text, 'lxml')
-                    listings = self._extract_html(soup)
+                    # 403 ou page vide — tentative via navigateur headless
+                    html_text = _ensure_browser().get_html(url, wait_selector='a[href*="/fr/annonces/"]') or ''
+                    if html_text:
+                        listings = self._extract_json(html_text)
+                        if not listings:
+                            listings = self._extract_html(BeautifulSoup(html_text, 'lxml'))
 
                 if not listings:
-                    logger.warning(f'[Agenz] page {page}: 0 annonce trouvée '
-                                   f'(NEXT_DATA et fallback HTML vides, {len(r.text)} octets reçus)')
+                    logger.warning(f'[Agenz] page {page}: 0 annonce trouvée même via navigateur headless '
+                                   f'({len(html_text)} octets reçus)')
                     break
 
                 for listing in listings:
@@ -1193,12 +1237,11 @@ class AgenzScraper:
                         _delay(0.5, 1.0)
                     yield listing
 
-            except Exception as e:
-                logger.warning(f'[Agenz] page {page}: {e}')
-                break
-
-            if page < max_pages:
-                _delay()
+                if page < max_pages:
+                    _delay()
+        finally:
+            if browser:
+                browser.close()
 
     def _extract_json(self, html: str) -> list:
         """Tente d'extraire les annonces depuis __NEXT_DATA__."""
