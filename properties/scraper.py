@@ -451,122 +451,120 @@ def _get(session, url, timeout=25) -> Optional[BeautifulSoup]:
     return None
 
 
+_PLAYWRIGHT_FETCH_SCRIPT = r'''
+import sys
+from playwright.sync_api import sync_playwright
+
+url = sys.argv[1]
+wait_selector = sys.argv[2] or None
+timeout_ms = int(sys.argv[3])
+select_timeout_ms = int(sys.argv[4])
+user_agent = sys.argv[5]
+
+with sync_playwright() as pw:
+    browser = pw.chromium.launch(
+        headless=True,
+        args=["--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage",
+              "--single-process", "--no-zygote"],
+    )
+    try:
+        context = browser.new_context(user_agent=user_agent, locale="fr-FR")
+        page = context.new_page()
+        page.goto(url, timeout=timeout_ms, wait_until="domcontentloaded")
+        if wait_selector:
+            try:
+                page.wait_for_selector(wait_selector, timeout=select_timeout_ms)
+            except Exception:
+                pass
+        else:
+            page.wait_for_timeout(4000)
+        html = page.content()
+    finally:
+        browser.close()
+
+sys.stdout.write(html)
+'''
+
+
 class _HeadlessBrowser:
     """
-    Session Playwright réutilisable pour plusieurs pages d'un même site.
-    Réservé aux sites confirmés comme servant une page de vérification
-    anti-bot en JavaScript (LogicImmo, MarocAnnonces) ou un blocage 403
-    lié à l'empreinte TLS (Avito, Agenz) — de simples requêtes HTTP ne
-    peuvent pas le résoudre. Un seul navigateur par source, fermé
-    explicitement après usage pour limiter la consommation mémoire (plan
-    Render gratuit à 512 Mo).
+    Fallback navigateur headless pour les sites confirmés comme servant une
+    page de vérification anti-bot en JavaScript (LogicImmo, MarocAnnonces)
+    ou un blocage lié à l'empreinte TLS/comportementale (Avito, Agenz,
+    Yakeey) — de simples requêtes HTTP ne peuvent pas le résoudre.
 
-    IMPORTANT : Playwright (API sync) manipule la boucle asyncio du thread
-    qui l'appelle. Exécuté directement dans un thread Gunicorn (gthread),
-    ça laisse ce thread dans un état où Django croit être dans un contexte
-    async et bloque ensuite tout appel ORM sur ce même thread
-    (SynchronousOnlyOperation), potentiellement pour d'autres requêtes
-    servies par ce thread ensuite. Toute interaction Playwright est donc
-    isolée dans un unique thread dédié (ThreadPoolExecutor à 1 worker),
-    jamais exécutée directement dans le thread appelant.
+    Chaque page est chargée dans un PROCESSUS SÉPARÉ (pas un thread) qui
+    peut être tué de force (SIGKILL sur tout le groupe de processus) s'il
+    dépasse son budget de temps. Nécessaire car certains sites laissent
+    simplement la connexion pendre sans jamais répondre : le propre timeout
+    interne de Playwright peut alors ne jamais se déclencher, surtout sous
+    contrainte CPU (plan Render gratuit). Une ancienne version réutilisait
+    un seul navigateur + un seul thread dédié pour toute une session de
+    scraping : si une page restait bloquée, ce thread restait bloqué pour
+    toujours et TOUTES les pages suivantes de la même session finissaient
+    aussi par expirer en attendant leur tour — sans jamais avoir été
+    réellement tentées. L'isolation par processus rend chaque page
+    indépendante : un blocage sur l'une n'affecte pas les autres, et la
+    mémoire du processus tué est proprement récupérée par l'OS.
     """
 
     def __init__(self):
-        self._executor = None
-        self._pw = None
-        self._browser = None
-        self._context = None
-
-    def _run(self, fn, timeout: float):
-        fut = self._executor.submit(fn)
-        return fut.result(timeout=timeout)
+        self._available = False
 
     def start(self) -> bool:
         try:
-            from playwright.sync_api import sync_playwright
+            import playwright.sync_api  # noqa: F401
         except ImportError:
             logger.info('[Playwright] module non installé — fallback JS désactivé')
             return False
-
-        import concurrent.futures
-        self._executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=1, thread_name_prefix='playwright'
-        )
-
-        def _init():
-            self._pw = sync_playwright().start()
-            self._browser = self._pw.chromium.launch(
-                headless=True,
-                args=['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
-                      '--single-process', '--no-zygote'],
-            )
-            self._context = self._browser.new_context(
-                user_agent=HEADERS['User-Agent'], locale='fr-FR',
-            )
-
-        try:
-            self._run(_init, timeout=40)
-            return True
-        except Exception as e:
-            logger.warning(f'[Playwright] démarrage impossible : {e!r}')
-            self.close()
-            return False
+        self._available = True
+        return True
 
     def get_html(self, url: str, wait_selector: str = None, timeout_ms: int = 30000) -> Optional[str]:
-        if not self._executor or not self._context:
+        if not self._available:
             return None
 
+        import subprocess, sys as _sys, os, signal
+
         select_timeout_ms = 8000
+        # Budget dur du processus entier : chargement Chromium + goto + wait_selector + marge.
+        hard_timeout = (timeout_ms + select_timeout_ms) / 1000 + 20
 
-        def _fetch():
-            page = self._context.new_page()
-            try:
-                page.goto(url, timeout=timeout_ms, wait_until='domcontentloaded')
-                if wait_selector:
-                    try:
-                        page.wait_for_selector(wait_selector, timeout=select_timeout_ms)
-                    except Exception:
-                        pass  # challenge anti-bot non résolu à temps — on prend ce qu'il y a
-                else:
-                    page.wait_for_timeout(4000)
-                return page.content()
-            finally:
-                try:
-                    page.close()
-                except Exception:
-                    pass
-
-        # Budget de l'executor = temps max réel de _fetch (goto + wait_selector) + marge.
-        # Un budget trop court coupe _fetch avant même que Playwright ait fini, ce qui
-        # se voit comme un TimeoutError (message vide) même quand la page a bien chargé.
         try:
-            return self._run(_fetch, timeout=(timeout_ms + select_timeout_ms) / 1000 + 15)
+            proc = subprocess.Popen(
+                [_sys.executable, '-c', _PLAYWRIGHT_FETCH_SCRIPT,
+                 url, wait_selector or '', str(timeout_ms), str(select_timeout_ms),
+                 HEADERS['User-Agent']],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except Exception as e:
+            logger.warning(f'[Playwright] lancement processus impossible : {e!r}')
+            return None
+
+        try:
+            out, _ = proc.communicate(timeout=hard_timeout)
+        except subprocess.TimeoutExpired:
+            logger.warning(f'[Playwright] {url}: bloqué plus de {hard_timeout:.0f}s, processus tué de force')
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                pass
+            try:
+                proc.communicate(timeout=5)
+            except Exception:
+                pass
+            return None
         except Exception as e:
             logger.warning(f'[Playwright] {url}: {e!r}')
             return None
 
+        if proc.returncode != 0 or not out:
+            return None
+        return out.decode('utf-8', errors='replace')
+
     def close(self):
-        if self._executor:
-            def _shutdown():
-                try:
-                    if self._browser:
-                        self._browser.close()
-                except Exception:
-                    pass
-                try:
-                    if self._pw:
-                        self._pw.stop()
-                except Exception:
-                    pass
-            try:
-                self._run(_shutdown, timeout=15)
-            except Exception:
-                pass
-            self._executor.shutdown(wait=True)
-            self._executor = None
-        self._browser = None
-        self._context = None
-        self._pw = None
+        pass
 
 
 def _empty_contact() -> dict:
