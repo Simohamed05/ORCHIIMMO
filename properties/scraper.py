@@ -1117,27 +1117,47 @@ class SaroutyScraper:
         except Exception:
             pass
 
-        for base_url in self.PAGES_URLS:
-            for page in range(1, max_pages + 1):
-                url = base_url if page == 1 else f'{base_url}?paged={page}'
-                soup = _get(session, url)
-                if not soup:
-                    logger.warning(f'[Sarouty] {url}: requête échouée (voir warning [GET] ci-dessus)')
-                    break
+        browser = None
 
-                listings = self._extract_listings(soup)
-                if not listings:
-                    logger.warning(f'[Sarouty] {url}: 0 annonce trouvée '
-                                   f'({len(str(soup))} octets) — {_debug_snippet(soup)}')
-                    break
+        def _ensure_browser():
+            nonlocal browser
+            if browser is None:
+                browser = _HeadlessBrowser()
+                browser.start()
+            return browser
 
-                for listing in listings:
-                    if city_filter and city_filter.lower() not in listing['city'].lower():
-                        continue
-                    yield listing
+        try:
+            for base_url in self.PAGES_URLS:
+                for page in range(1, max_pages + 1):
+                    url = base_url if page == 1 else f'{base_url}?paged={page}'
+                    soup = _get(session, url)
+                    listings = self._extract_listings(soup) if soup else []
 
-                if page < max_pages:
-                    _delay()
+                    if not listings:
+                        # Page quasi vide (SPA rendue en JS cote client) : les
+                        # requetes HTTP classiques ne recuperent que la coquille
+                        # HTML vide, sans le contenu injecte par React ensuite.
+                        html = _ensure_browser().get_html(url) or ''
+                        if html:
+                            soup = BeautifulSoup(html, 'lxml')
+                            listings = self._extract_listings(soup)
+
+                    if not listings:
+                        logger.warning(f'[Sarouty] {url}: 0 annonce trouvée même via navigateur headless '
+                                       f'({len(str(soup)) if soup else 0} octets) — '
+                                       f'{_debug_snippet(soup) if soup else "aucune page reçue"}')
+                        break
+
+                    for listing in listings:
+                        if city_filter and city_filter.lower() not in listing['city'].lower():
+                            continue
+                        yield listing
+
+                    if page < max_pages:
+                        _delay()
+        finally:
+            if browser:
+                browser.close()
 
     def _extract_listings(self, soup: BeautifulSoup) -> list:
         results = []
