@@ -119,6 +119,14 @@ body.light-mode .fw-semibold { color: #0F172A; }
 body.light-mode .text-muted { color: #64748B !important; }
 body.light-mode .text-white { color: #0F172A !important; }
 body.light-mode small { color: #64748B; }
+/* Les span/div/strong à l'intérieur d'un bouton ou d'un badge colorés ne
+   doivent jamais être repeints en gris foncé par les règles ci-dessus :
+   ça rendait le texte illisible sur fond dégradé bleu/violet
+   ("Explorer le Catalogue", "Lancer le Scraping", "Ouvrir dans Power BI"...). */
+body.light-mode .btn span, body.light-mode .btn div, body.light-mode .btn strong,
+body.light-mode .btn b, body.light-mode .btn small,
+body.light-mode .badge span, body.light-mode .badge div,
+body.light-mode .badge strong, body.light-mode .badge b { color: inherit; }
 /* Preserve colored utility classes in light mode */
 body.light-mode [class*="text-primary"] { color: var(--accent) !important; }
 body.light-mode [class*="text-success"] { color: #16A34A !important; }

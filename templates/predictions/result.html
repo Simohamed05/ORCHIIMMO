@@ -237,8 +237,9 @@ if (withGeo.length > 0) {
 }
 
 const map = L.map('map').setView(center, zoom);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap', maxZoom: 18
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap contributors © CARTO',
+  subdomains: 'abcd', maxZoom: 18
 }).addTo(map);
 
 // Marqueur de la ville prédite (même sans coords exactes)

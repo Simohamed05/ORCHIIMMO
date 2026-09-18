@@ -521,8 +521,9 @@ const mapData = {{ map_data_json|safe }};
 if (mapData.length > 0) {
   const main = mapData.find(d => d.main) || mapData[0];
   const map = L.map('map').setView([main.lat, main.lng], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap',
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO',
+    subdomains: 'abcd',
     maxZoom: 18
   }).addTo(map);
 
