@@ -199,7 +199,6 @@ def property_list(request):
     scrape_sources = [
         ('mubawab',       'Mubawab'),
         ('avito',         'Avito'),
-        ('sarouty',       'Sarouty'),
         ('masaken',       'Masaken'),
         ('bikhir',        'Bikhir'),
         ('yakeey',        'Yakeey'),
@@ -281,7 +280,7 @@ def scrape_stream(request):
       city      = filtre ville optionnel
     """
     sources_param = request.GET.get('sources',
-        'mubawab,avito,sarouty,masaken,bikhir,yakeey'
+        'mubawab,avito,masaken,bikhir,yakeey'
     )
     sources = [s.strip() for s in sources_param.split(',') if s.strip()]
 
