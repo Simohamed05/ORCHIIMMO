@@ -1,8 +1,8 @@
 # Orchiimmo — notes pour les prochaines sessions
 
-## À faire ensuite
-- **Vérifier l'extraction des caractéristiques** pour Avito et les autres
-  sources (Mubawab, Sarouty, Masaken, Bikhir, Yakeey) : plusieurs annonces
-  scrapées n'ont pas toutes leurs caractéristiques (surface, chambres, SDB,
-  etc.) correctement remplies. À auditer scraper par scraper dans
-  `properties/scraper.py`.
+## Fait
+- Audit des 6 sources actives (Mubawab, Avito, Sarouty, Masaken, Bikhir,
+  Yakeey) dans `properties/scraper.py` : deux trous trouvés et corrigés
+  (Avito `_parse_soup_card` ne remplissait ni chambres ni SDB ; Masaken
+  ne remplissait jamais les SDB). Les 4 autres extrayaient déjà tout
+  correctement.
