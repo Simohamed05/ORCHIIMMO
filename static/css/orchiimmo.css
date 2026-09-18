@@ -106,7 +106,8 @@ body.light-mode .input-group-text {
 }
 body.light-mode .form-check-input {
   background: #fff !important;
-  border-color: #94A3B8 !important;
+  border-color: #64748B !important;
+  border-width: 1.5px !important;
 }
 body.light-mode .form-check-label { color: #334155; }
 
@@ -127,6 +128,17 @@ body.light-mode .btn span, body.light-mode .btn div, body.light-mode .btn strong
 body.light-mode .btn b, body.light-mode .btn small,
 body.light-mode .badge span, body.light-mode .badge div,
 body.light-mode .badge strong, body.light-mode .badge b { color: inherit; }
+/* Bouton "outline-light" (bordure + texte blancs) : invisible sur le fond
+   clair du hero en mode clair ("Estimer mon Bien"). */
+body.light-mode .btn-outline-light {
+  border-color: rgba(29,78,216,0.4) !important;
+  color: #1D4ED8 !important;
+}
+body.light-mode .btn-outline-light:hover {
+  background: rgba(29,78,216,0.08) !important;
+  border-color: #1D4ED8 !important;
+  color: #1D4ED8 !important;
+}
 /* Preserve colored utility classes in light mode */
 body.light-mode [class*="text-primary"] { color: var(--accent) !important; }
 body.light-mode [class*="text-success"] { color: #16A34A !important; }
