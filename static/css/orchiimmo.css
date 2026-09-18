@@ -1059,6 +1059,9 @@ main { flex: 1; }
   opacity: 1;
   border-color: var(--accent, #4895EF);
 }
+body.light-mode .detail-thumbs { background: #F1F5F9; }
+body.light-mode .detail-thumb { opacity: .7; }
+body.light-mode .detail-thumb:hover { opacity: .9; }
 
 /* ── RESULT CARD ─────────────────────────────────────────────── */
 .card.border-primary {
@@ -1219,6 +1222,10 @@ body.light-mode .pbi-placeholder {
   background: var(--card) !important;
   color: var(--text) !important;
   border-color: var(--border) !important;
+}
+body.light-mode .leaflet-popup-content-wrapper,
+body.light-mode .leaflet-popup-tip {
+  background: rgba(255,255,255,0.97) !important;
 }
 
 /* ── BREADCRUMB ──────────────────────────────────────────────── */
