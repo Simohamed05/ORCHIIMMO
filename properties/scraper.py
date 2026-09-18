@@ -1082,10 +1082,14 @@ class AvitoScraper:
         href  = ('https://www.avito.ma' + link['href']) if link and link.get('href') else ''
         title = (link.get_text(strip=True) if link else '')[:300]
         area_m2 = _parse_area(text)
+        bedrooms_m = re.search(r'(\d+)\s*(?:chambres?|pi[eè]ces?|ch\.)', text, re.I)
+        bedrooms = int(bedrooms_m.group(1)) if bedrooms_m else None
+        bathrooms_m = re.search(r'(\d+)\s*(?:salles?\s*de\s*bains?|sdb)', text, re.I)
+        bathrooms = int(bathrooms_m.group(1)) if bathrooms_m else None
 
         images = _extract_card_images(card, 'https://www.avito.ma')
         return _make_listing(self.SOURCE, 'Maroc', '', _guess_type(title),
-                             title, price_mad, area_m2, None, None, href,
+                             title, price_mad, area_m2, bedrooms, bathrooms, href,
                              {**_empty_contact(), 'image_url': images[0] if images else '',
                               'image_urls': images})
 
@@ -1583,6 +1587,8 @@ class MarocAnnoncesScraper:
             area_m2  = _parse_area(full_text)
             bedrooms_m = re.search(r'(\d+)\s*(?:chambre|ch\.)', full_text, re.I)
             bedrooms = int(bedrooms_m.group(1)) if bedrooms_m else None
+            bathrooms_m = re.search(r'(\d+)\s*(?:salles?\s*de\s*bains?|sdb)', full_text, re.I)
+            bathrooms = int(bathrooms_m.group(1)) if bathrooms_m else None
 
             # Contact — numéro partiel [id*=phone] + enrichissement complet
             contact = _empty_contact()
@@ -1620,7 +1626,7 @@ class MarocAnnoncesScraper:
 
             return _make_listing(self.SOURCE, city, dist,
                                  _guess_type(title + ' ' + full_text), title,
-                                 price_mad, area_m2, bedrooms, None, url, contact)
+                                 price_mad, area_m2, bedrooms, bathrooms, url, contact)
         except Exception as e:
             logger.debug(f'[MarocAnnonces] detail error ({url[:60]}): {e}')
             return None
