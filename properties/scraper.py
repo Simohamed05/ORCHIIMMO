@@ -508,7 +508,7 @@ class _HeadlessBrowser:
             self._run(_init, timeout=40)
             return True
         except Exception as e:
-            logger.warning(f'[Playwright] démarrage impossible : {e}')
+            logger.warning(f'[Playwright] démarrage impossible : {e!r}')
             self.close()
             return False
 
@@ -516,13 +516,15 @@ class _HeadlessBrowser:
         if not self._executor or not self._context:
             return None
 
+        select_timeout_ms = 8000
+
         def _fetch():
             page = self._context.new_page()
             try:
                 page.goto(url, timeout=timeout_ms, wait_until='domcontentloaded')
                 if wait_selector:
                     try:
-                        page.wait_for_selector(wait_selector, timeout=timeout_ms)
+                        page.wait_for_selector(wait_selector, timeout=select_timeout_ms)
                     except Exception:
                         pass  # challenge anti-bot non résolu à temps — on prend ce qu'il y a
                 else:
@@ -534,10 +536,13 @@ class _HeadlessBrowser:
                 except Exception:
                     pass
 
+        # Budget de l'executor = temps max réel de _fetch (goto + wait_selector) + marge.
+        # Un budget trop court coupe _fetch avant même que Playwright ait fini, ce qui
+        # se voit comme un TimeoutError (message vide) même quand la page a bien chargé.
         try:
-            return self._run(_fetch, timeout=(timeout_ms / 1000) + 15)
+            return self._run(_fetch, timeout=(timeout_ms + select_timeout_ms) / 1000 + 15)
         except Exception as e:
-            logger.warning(f'[Playwright] {url}: {e}')
+            logger.warning(f'[Playwright] {url}: {e!r}')
             return None
 
     def close(self):
