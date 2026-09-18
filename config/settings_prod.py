@@ -34,7 +34,21 @@ if _DB_URL:
 
 # ─── Fichiers statiques (WhiteNoise) ─────────────────────────────────────────
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+# Django 5.1+ ignore le réglage STATICFILES_STORAGE (supprimé au profit de
+# STORAGES) : sans ce dict, ce backend WhiteNoise n'était en réalité jamais
+# utilisé, malgré sa présence dans ce fichier depuis le début.
+# Manifest (pas juste Compressed) : chaque fichier statique reçoit un nom
+# haché à chaque déploiement, donc le navigateur va toujours chercher la
+# bonne version au lieu de garder une ancienne copie en cache (ex. CSS de
+# galerie photo qui restait bloquée sur une version obsolète malgré le push).
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # ─── Sécurité HTTPS ───────────────────────────────────────────────────────────
