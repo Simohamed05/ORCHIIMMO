@@ -109,6 +109,13 @@ body.light-mode .form-check-input {
   border-color: #64748B !important;
   border-width: 1.5px !important;
 }
+/* La regle ci-dessus (specificite body.light-mode + .form-check-input)
+   l'emporte sur .form-check-input:checked et repeignait les cases cochees
+   en blanc : impossible de voir quelle source etait selectionnee. */
+body.light-mode .form-check-input:checked {
+  background: linear-gradient(135deg, var(--accent), var(--accent2)) !important;
+  border-color: var(--accent) !important;
+}
 body.light-mode .form-check-label { color: #334155; }
 
 /* Textes */
