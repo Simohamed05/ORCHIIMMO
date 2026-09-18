@@ -512,7 +512,7 @@ class _HeadlessBrowser:
             self.close()
             return False
 
-    def get_html(self, url: str, wait_selector: str = None, timeout_ms: int = 20000) -> Optional[str]:
+    def get_html(self, url: str, wait_selector: str = None, timeout_ms: int = 30000) -> Optional[str]:
         if not self._executor or not self._context:
             return None
 
