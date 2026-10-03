@@ -295,8 +295,9 @@ def scrape_stream(request):
         """Générateur SSE : yield chaque annonce au format data: {...}\n\n"""
         from .scraper import scrape_all
 
+        ville_suffix = f' — ville : {city_filter}' if city_filter else ''
         yield _sse('status', {
-            'msg': f'Scraping démarré : {", ".join(sources)} — {max_pages} pages/site',
+            'msg': f'Scraping démarré : {", ".join(sources)} — {max_pages} pages/site{ville_suffix}',
             'sources': sources,
         })
 

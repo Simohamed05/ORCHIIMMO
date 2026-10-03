@@ -62,6 +62,12 @@
             <option value="5">5 pages</option>
             <option value="10">10 pages</option>
           </select>
+          <input id="scrape-city" type="text" list="scrape-city-list"
+                 class="form-control form-control-sm" style="width:140px;background:#1e2d4a;color:#e2e8f0;border-color:#334155;"
+                 placeholder="Ville (optionnel)" autocomplete="off">
+          <datalist id="scrape-city-list">
+            {% for v in villes %}<option value="{{ v }}">{% endfor %}
+          </datalist>
         </div>
       </div>
 
@@ -499,6 +505,7 @@ function startScrape() {
   }
 
   const pages = document.getElementById('scrape-pages').value;
+  const city  = document.getElementById('scrape-city').value.trim();
 
   // UI → état "en cours"
   document.getElementById('btn-scrape').classList.add('d-none');
@@ -509,7 +516,8 @@ function startScrape() {
   document.getElementById('count-new').textContent = '0';
   document.getElementById('count-dup').textContent = '0';
 
-  const url = `{% url 'properties:scrape_stream' %}?sources=${encodeURIComponent(sources)}&pages=${pages}`;
+  let url = `{% url 'properties:scrape_stream' %}?sources=${encodeURIComponent(sources)}&pages=${pages}`;
+  if (city) url += `&city=${encodeURIComponent(city)}`;
   evtSource  = new EventSource(url);
 
   evtSource.addEventListener('status', e => {
