@@ -2205,6 +2205,12 @@ def scrape_all(sources: list = None, max_pages: int = 5,
         logger.info(f'[Scraper] Démarrage {source_name}…')
         try:
             for listing in cls().scrape(max_pages=max_pages, city_filter=city_filter):
+                # On ne veut que les annonces de particuliers (ou de type non
+                # determine, par prudence) : les agences sont ignorees avant
+                # meme d'etre sauvegardees ou affichees dans le flux live.
+                if listing.get('contact_type') == 'agence':
+                    continue
+
                 url    = listing.get('url', '')
                 is_dup = bool(url and Property.objects.filter(url=url).exists())
 
