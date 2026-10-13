@@ -26,6 +26,7 @@ urlpatterns = [
     path('predict/',     include('predictions.urls', namespace='predictions')),
     path('properties/',  include('properties.urls',  namespace='properties')),
     path('dashboards/',  include('dashboards.urls',  namespace='dashboards')),
+    path('crm/',         include('crm.urls',         namespace='crm')),
     path('chatbot/',     chatbot_proxy,                                  name='chatbot_proxy'),
 
     # ─── Password Reset (Django built-in) ───────────────────────────────────

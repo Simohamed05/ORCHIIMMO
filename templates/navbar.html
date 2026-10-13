@@ -51,6 +51,16 @@
             <span data-lang-ar>لوحات البيانات</span>
           </a>
         </li>
+        {% if user.is_staff %}
+        <li class="nav-item">
+          <a class="nav-link {% if 'crm' in request.resolver_match.app_name %}active{% endif %}"
+             href="{% url 'crm:client_list' %}">
+            <i class="bi bi-people-fill me-1"></i>
+            <span data-lang-fr>Clients</span>
+            <span data-lang-ar>العملاء</span>
+          </a>
+        </li>
+        {% endif %}
       </ul>
 
       <!-- Droite : auth -->

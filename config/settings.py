@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'predictions',
     'properties.apps.PropertiesConfig',
     'dashboards',
+    'crm',
 ]
 
 MIDDLEWARE = [

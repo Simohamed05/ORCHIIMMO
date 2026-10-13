@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% block title %}{{ client.name }} — Orchiimmo{% endblock %}
+
+{% block content %}
+
+<nav aria-label="breadcrumb" class="mb-4">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'crm:client_list' %}">Clients</a></li>
+    <li class="breadcrumb-item active">{{ client.name }}</li>
+  </ol>
+</nav>
+
+<div class="row g-4">
+
+  <!-- Fiche client -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h4 class="fw-bold mb-1">{{ client.name }}</h4>
+        <p class="text-muted mb-3">
+          <i class="bi bi-telephone me-1"></i>{{ client.phone }}
+          {% if client.email %}<br><i class="bi bi-envelope me-1"></i>{{ client.email }}{% endif %}
+        </p>
+
+        <a href="{{ client.whatsapp_url }}" target="_blank" rel="noopener"
+           class="btn btn-success btn-sm w-100 mb-3">
+          <i class="bi bi-whatsapp me-1"></i>Contacter sur WhatsApp
+        </a>
+
+        <hr>
+        <p class="small text-muted mb-2">Recherche</p>
+        <ul class="list-unstyled small mb-0">
+          <li><i class="bi bi-geo-alt me-1 text-muted"></i>
+            {{ client.city|default:'Toutes villes' }}</li>
+          <li><i class="bi bi-house me-1 text-muted"></i>
+            {{ client.get_property_type_display|default:'Tous types' }}</li>
+          <li><i class="bi bi-cash me-1 text-muted"></i>
+            {% if client.price_min or client.price_max %}
+              {{ client.price_min|default:'0'|floatformat:0 }} — {{ client.price_max|default:'∞'|floatformat:0 }} DH
+            {% else %}Budget libre{% endif %}
+          </li>
+          {% if client.bedrooms_min %}
+          <li><i class="bi bi-door-open me-1 text-muted"></i>{{ client.bedrooms_min }}+ chambres</li>
+          {% endif %}
+        </ul>
+
+        {% if client.notes %}
+        <hr>
+        <p class="small text-muted mb-1">Notes</p>
+        <p class="small mb-0">{{ client.notes|linebreaksbr }}</p>
+        {% endif %}
+
+        <form method="post" action="{% url 'crm:client_delete' client.pk %}" class="mt-3"
+              onsubmit="return confirm('Supprimer ce client ?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+            <i class="bi bi-trash me-1"></i>Supprimer
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Biens correspondants + visites -->
+  <div class="col-lg-8">
+
+    <h5 class="fw-bold mb-3">
+      <i class="bi bi-stars text-warning me-1"></i>
+      Biens correspondants <span class="badge bg-secondary">{{ matches|length }}</span>
+    </h5>
+
+    {% if matches %}
+    <div class="card shadow-sm mb-4">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Bien</th>
+              <th>Prix</th>
+              <th>Caractéristiques</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in matches %}
+            <tr>
+              <td>
+                <a href="{% url 'properties:detail' p.pk %}" class="text-decoration-none fw-semibold">
+                  {{ p.city }}{% if p.district %} — {{ p.district }}{% endif %}
+                </a>
+                <br><span class="small text-muted">{{ p.get_property_type_display }}</span>
+              </td>
+              <td class="fw-semibold">{{ p.prix_formate }}</td>
+              <td class="small text-muted">
+                {% if p.area_m2 %}{{ p.area_m2|floatformat:0 }} m²{% endif %}
+                {% if p.bedrooms %} · {{ p.bedrooms }} ch.{% endif %}
+              </td>
+              <td class="text-end">
+                <button type="button" class="btn btn-outline-primary btn-sm"
+                        data-bs-toggle="collapse" data-bs-target="#visit-form-{{ p.pk }}">
+                  <i class="bi bi-calendar-plus"></i> Visite
+                </button>
+              </td>
+            </tr>
+            <tr class="collapse" id="visit-form-{{ p.pk }}">
+              <td colspan="4" class="bg-transparent">
+                <form method="post" action="{% url 'crm:visit_create' client.pk %}"
+                      class="d-flex gap-2 align-items-end flex-wrap py-2">
+                  {% csrf_token %}
+                  <input type="hidden" name="property_id" value="{{ p.pk }}">
+                  <div>
+                    <label class="form-label small mb-1">Date de visite</label>
+                    <input type="datetime-local" name="scheduled_at"
+                           class="form-control form-control-sm" required>
+                  </div>
+                  <div class="flex-grow-1">
+                    <label class="form-label small mb-1">Note (optionnel)</label>
+                    <input type="text" name="notes" class="form-control form-control-sm">
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-sm">Planifier</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-body text-center text-muted py-4">
+        Aucun bien du catalogue ne correspond à ces critères pour l'instant.
+      </div>
+    </div>
+    {% endif %}
+
+    <h5 class="fw-bold mb-3">
+      <i class="bi bi-calendar-check text-primary me-1"></i>
+      Visites <span class="badge bg-secondary">{{ visits|length }}</span>
+    </h5>
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Bien</th>
+              <th>Date</th>
+              <th>Statut</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in visits %}
+            <tr>
+              <td>
+                <a href="{% url 'properties:detail' v.target_property.pk %}" class="text-decoration-none">
+                  {{ v.target_property.city }}{% if v.target_property.district %} — {{ v.target_property.district }}{% endif %}
+                </a>
+              </td>
+              <td class="small">{{ v.scheduled_at|date:'d/m/Y H:i' }}</td>
+              <td>
+                <form method="post" action="{% url 'crm:visit_update_status' v.pk %}" class="d-inline">
+                  {% csrf_token %}
+                  <select name="status" class="form-select form-select-sm d-inline-block w-auto"
+                          onchange="this.form.submit()">
+                    {% for val, label in v.STATUS_CHOICES %}
+                      <option value="{{ val }}" {% if v.status == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+              </td>
+              <td class="small text-muted">{{ v.notes|default:'—' }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center text-muted py-4">Aucune visite planifiée.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
